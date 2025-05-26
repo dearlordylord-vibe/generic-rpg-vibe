@@ -1,16 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { saveState, loadState } from '../store/slices/gameSlice';
 import { initializePlayer, addXP, clearLevelUpMessage, selectLevelUpMessage } from '../store/slices/playerSlice';
 import { config as gameConfig } from '../game/config';
 import PlayerStats from './PlayerStats';
 import StatAllocation from './StatAllocation';
+import Inventory from './Inventory';
 import './Game.css';
 
 export default function Game() {
   const gameRef = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
   const levelUpMessage = useAppSelector(selectLevelUpMessage);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
 
   useEffect(() => {
     // Initialize game state and player on first load
@@ -63,6 +65,9 @@ export default function Game() {
           <button className="xp-button" onClick={handleAddXP}>
             Add XP (Test)
           </button>
+          <button className="inventory-button" onClick={() => setIsInventoryOpen(true)}>
+            Inventory (I)
+          </button>
         </div>
         {levelUpMessage && (
           <div className="level-up-notification">
@@ -71,6 +76,10 @@ export default function Game() {
           </div>
         )}
       </div>
+      <Inventory 
+        isOpen={isInventoryOpen} 
+        onClose={() => setIsInventoryOpen(false)} 
+      />
     </div>
   );
 } 
