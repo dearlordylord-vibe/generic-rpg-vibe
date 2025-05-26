@@ -20,7 +20,8 @@
       "mcp__taskmaster__analyze_project_complexity",
       "mcp__taskmaster__expand_task",
       "mcp__taskmaster__add_subtask",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": []
   }

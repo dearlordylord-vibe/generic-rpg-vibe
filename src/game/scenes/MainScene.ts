@@ -7,12 +7,12 @@ import { PlayerStats } from '../models/PlayerStats';
 import { InventoryManager } from '../models/InventoryManager';
 import { FeedbackManager, CombatFeedback } from '../feedback/FeedbackManager';
 import { InputHandler } from '../input/InputHandler';
+import { damagePlayer } from '../../store/slices/playerSlice';
 
 interface AnimationConfig {
   start: number;
   end: number;
   frameRate: number;
-  duration: number;
 }
 
 type AnimationKey = 'idle' | 'walk';
@@ -33,9 +33,10 @@ export default class MainScene extends Scene {
   private assetsLoaded: boolean = false;
   private animationsCreated: boolean = false;
   private enemyHealthBars: Map<string, Phaser.GameObjects.Container> = new Map();
+  private dispatch?: (action: any) => void;
   private readonly ANIMATION_CONFIG: AnimationConfigs = {
-    idle: { start: 0, end: 3, frameRate: 8, duration: 500 },
-    walk: { start: 4, end: 7, frameRate: 12, duration: 400 }
+    idle: { start: 0, end: 3, frameRate: 8 },
+    walk: { start: 4, end: 7, frameRate: 12 }
   };
 
   constructor() {
@@ -348,31 +349,20 @@ export default class MainScene extends Scene {
     const baseDamage = enemyStats.physicalDamage;
     const damage = Math.max(1, Math.floor(baseDamage * (0.8 + Math.random() * 0.4))); // 80-120% of base damage
     
-    // Apply damage to player
-    const playerHealthBefore = this.combatManager.getPlayerCurrentHealth();
-    this.combatManager.damagePlayer(damage);
+    // Apply damage to player via Redux
+    if (this.dispatch) {
+      this.dispatch(damagePlayer(damage));
+      
+      // Show damage feedback on player
+      this.createFloatingDamageText(this.cat.x, this.cat.y - 20, damage, false);
+    }
     
-    // Get updated player health
-    const playerCurrentHealth = this.combatManager.getPlayerCurrentHealth();
-    const playerMaxHealth = this.combatManager.getPlayerStats().getDerivedStats().maxHealth;
-    
-    console.log(`Player took ${damage} damage: ${playerHealthBefore} -> ${playerCurrentHealth} / ${playerMaxHealth}`);
-    
-    // Show damage feedback on player
-    this.createFloatingDamageText(this.cat.x, this.cat.y - 20, damage, false);
-    
-    // Update HUD with new player health
-    this.events.emit('hudUpdate', { 
-      playerHealth: playerCurrentHealth,
-      maxHealth: playerMaxHealth 
-    });
-    
-    // Visual attack feedback
-    this.add.circle(enemySprite.x, enemySprite.y, 20, 0xff0000, 0.5)
+    // Visual attack feedback on player
+    const damageEffect = this.add.circle(this.cat.x, this.cat.y, 15, 0xff0000, 0.3)
       .setDepth(1000);
     
     this.time.delayedCall(200, () => {
-      // Remove attack visual after 200ms
+      damageEffect.destroy();
     });
     
     console.log(`Enemy ${enemyId} attacked player for ${damage} damage`);
@@ -1147,16 +1137,12 @@ export default class MainScene extends Scene {
     if (this.combatManager) {
       // Update the player stats in the existing combat manager
       this.combatManager.updatePlayerStats(playerStats);
-      
-      // Emit initial HUD update with correct health values
-      const derivedStats = playerStats.getDerivedStats();
-      this.events.emit('hudUpdate', {
-        playerHealth: derivedStats.currentHealth,
-        maxHealth: derivedStats.maxHealth,
-        playerMana: derivedStats.currentMana,
-        maxMana: derivedStats.maxMana
-      });
     }
+  }
+
+  // Method to set Redux dispatch function
+  public setDispatch(dispatch: (action: any) => void) {
+    this.dispatch = dispatch;
   }
 
   private triggerEnemyReaction(enemy: { sprite: Phaser.GameObjects.Sprite }, reactionType: 'hit' | 'blocked' | 'dodge', isCritical: boolean = false) {
@@ -1318,8 +1304,7 @@ export default class MainScene extends Scene {
       key,
       frames: this.anims.generateFrameNumbers('cat', { start: config.start, end: config.end }),
       frameRate: config.frameRate,
-      repeat: -1,
-      duration: config.duration
+      repeat: -1
     });
   }
 
@@ -1440,12 +1425,6 @@ export default class MainScene extends Scene {
 
   private updateAnimation(newAnimation: AnimationKey) {
     if (!this.anims.exists(newAnimation)) return;
-
-    const anim = this.anims.get(newAnimation);
-    if (!anim?.duration) {
-      console.warn(`Animation ${newAnimation} has no duration`);
-      return;
-    }
 
     if (!this.cat.anims.currentAnim || this.cat.anims.currentAnim.key !== newAnimation) {
       this.cat.play(newAnimation, true);

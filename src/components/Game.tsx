@@ -48,6 +48,16 @@ export default function Game() {
     }
   }, [playerStats]);
 
+  // Sync player stats to the scene when they change
+  useEffect(() => {
+    if (gameInstanceRef.current && playerStats) {
+      const mainScene = gameInstanceRef.current.scene.getScene('MainScene') as any;
+      if (mainScene && mainScene.setPlayerStats) {
+        mainScene.setPlayerStats(playerStats);
+      }
+    }
+  }, [playerStats]);
+
   useEffect(() => {
     if (!gameRef.current) return;
 
@@ -59,19 +69,13 @@ export default function Game() {
     
     gameInstanceRef.current = game;
 
-    // Set up HUD state communication
-    const mainScene = game.scene.getScene('MainScene') as any;
-    if (mainScene) {
-      // Pass player stats to the scene
-      if (playerStats) {
-        mainScene.setPlayerStats(playerStats);
+    // Set up HUD state communication when scene is ready
+    game.events.once('ready', () => {
+      const mainScene = game.scene.getScene('MainScene') as any;
+      if (mainScene) {
+        mainScene.setDispatch(dispatch);
       }
-      
-      // Listen for HUD updates from the scene
-      mainScene.events.on('hudUpdate', (data: any) => {
-        setHudState(prev => ({ ...prev, ...data }));
-      });
-    }
+    });
 
     // Auto-save game state every 5 minutes
     const saveInterval = setInterval(() => {

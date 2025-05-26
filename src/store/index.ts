@@ -14,11 +14,11 @@ export const store = configureStore({
     getDefaultMiddleware({
       serializableCheck: {
         // Ignore these action types
-        ignoredActions: ['game/loadState', 'player/updateStats', 'player/updateLevel', 'player/updateEquipment'],
+        ignoredActions: ['game/loadState', 'player/updateStats', 'player/updateLevel', 'player/updateEquipment', 'player/damagePlayer'],
         // Ignore these field paths in all actions
         ignoredActionPaths: ['payload.stats', 'payload.level', 'payload.equipment'],
         // Ignore these paths in the state
-        ignoredPaths: ['game.player.stats', 'game.player.level', 'game.player.equipment']
+        ignoredPaths: ['game.player.stats', 'game.player.level', 'game.player.equipment', 'player.stateManager']
       }
     })
 });

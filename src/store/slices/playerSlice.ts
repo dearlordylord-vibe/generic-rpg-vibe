@@ -122,6 +122,13 @@ export const playerSlice = createSlice({
     },
     clearStateHistory: (state) => {
       state.stateManager.clearHistory();
+    },
+    damagePlayer: (state, action: PayloadAction<number>) => {
+      if (!state.stats) return;
+      
+      const stats = PlayerStats.deserialize(state.stats);
+      stats.modifyHealth(-action.payload);
+      state.stats = stats.serialize();
     }
   }
 });
@@ -139,7 +146,8 @@ export const {
   saveStateSnapshot,
   undoState,
   redoState,
-  clearStateHistory
+  clearStateHistory,
+  damagePlayer
 } = playerSlice.actions;
 
 // Selectors
