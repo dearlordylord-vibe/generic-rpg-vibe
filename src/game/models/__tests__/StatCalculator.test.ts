@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { StatCalculator, FinalStats, EquipmentBonuses } from '../StatCalculator';
+import { StatCalculator } from '../StatCalculator';
 import { InventoryManager } from '../InventoryManager';
 import { Equipment, EquipmentType, EquipmentSlot } from '../Equipment';
 import { PlayerStats } from '../PlayerStats';
@@ -345,7 +345,6 @@ describe('StatCalculator', () => {
       
       // Equip sword
       inventoryManager.equipItem('sword-1', playerStats, playerLevel);
-      const withSword = statCalculator.calculateFinalStats();
       
       // Unequip sword
       inventoryManager.unequipItem(EquipmentSlot.WEAPON);

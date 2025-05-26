@@ -1,5 +1,6 @@
 import { PlayerStats, IBaseStats, IDerivedStats } from './PlayerStats';
 import { InventoryManager, EquippedItems } from './InventoryManager';
+import { EquipmentSlot } from './Equipment';
 
 export interface FinalStats extends IBaseStats {
   bonusStrength: number;
@@ -151,7 +152,6 @@ export class StatCalculator {
     };
     const bonuses = this.calculateEquipmentBonuses();
     const multipliers = this.calculateEquipmentMultipliers();
-    const equippedItems = this.inventoryManager.getAllEquippedItems();
 
     // Create stat breakdowns
     const createBreakdown = (stat: keyof IBaseStats): StatBreakdown => ({
@@ -232,8 +232,8 @@ export class StatCalculator {
       }
       
       // Temporarily simulate equipping
-      const slot = item.equipment.getSlot();
-      const tempEquipped = { ...currentEquipped };
+      const slot: EquipmentSlot = item.equipment.getSlot();
+      const tempEquipped: EquippedItems = { ...currentEquipped };
       tempEquipped[slot] = item.equipment;
       
       return this.calculateFinalStatsFromEquipped(tempEquipped);
@@ -244,8 +244,8 @@ export class StatCalculator {
         throw new Error(`Equipment with ID ${equipmentId} is not equipped`);
       }
       
-      const slot = itemToUnequip.getSlot();
-      const tempEquipped = { ...currentEquipped };
+      const slot: EquipmentSlot = itemToUnequip.getSlot();
+      const tempEquipped: EquippedItems = { ...currentEquipped };
       delete tempEquipped[slot];
       
       return this.calculateFinalStatsFromEquipped(tempEquipped);
@@ -355,7 +355,6 @@ export class StatCalculator {
     this.removeEquipmentModifiers();
     
     // Add new equipment modifiers
-    const bonuses = this.calculateEquipmentBonuses();
     const equipmentContributions = this.getEquipmentContributions();
     
     for (const [equipmentId, contribution] of Object.entries(equipmentContributions)) {
