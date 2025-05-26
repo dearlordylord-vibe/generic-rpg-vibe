@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { GameState, IInventoryItem } from '../../game/models/GameState';
+import { Equipment, EquipmentSlot, EquipmentType } from '../../game/models/Equipment';
 import { StorageService } from '../../game/services/StorageService';
 import { RootState } from '..';
 
@@ -178,6 +179,98 @@ export const gameSlice = createSlice({
       } catch (error) {
         state.error = error instanceof Error ? error.message : 'Failed to add test items';
       }
+    },
+    addTestEquipment: (state) => {
+      try {
+        if (!state.serializedState) return;
+        const gameState = new GameState();
+        gameState.deserialize(state.serializedState);
+        
+        // Create test equipment items
+        const testEquipment = [
+          new Equipment(
+            'test_sword',
+            'Iron Sword',
+            EquipmentType.WEAPON,
+            EquipmentSlot.WEAPON,
+            { level: 1 },
+            { bonuses: { strength: 5, dexterity: 2 } },
+            'A basic iron sword for beginners.',
+            1
+          ),
+          new Equipment(
+            'test_helmet',
+            'Leather Helm',
+            EquipmentType.ARMOR,
+            EquipmentSlot.HEAD,
+            { level: 1 },
+            { bonuses: { vitality: 3 } },
+            'A simple leather helmet.',
+            1
+          ),
+          new Equipment(
+            'test_armor',
+            'Cloth Robe',
+            EquipmentType.ARMOR,
+            EquipmentSlot.BODY,
+            { level: 1 },
+            { bonuses: { intelligence: 4, vitality: 2 } },
+            'A basic cloth robe.',
+            1
+          ),
+          new Equipment(
+            'test_gloves',
+            'Leather Gloves',
+            EquipmentType.ARMOR,
+            EquipmentSlot.PAWS,
+            { level: 1 },
+            { bonuses: { dexterity: 3 } },
+            'Simple leather gloves.',
+            1
+          )
+        ];
+        
+        // Add equipment to inventory
+        testEquipment.forEach(equipment => {
+          gameState.addItemToInventory(equipment, 1);
+        });
+        
+        state.serializedState = gameState.serialize();
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : 'Failed to add test equipment';
+      }
+    },
+    equipItem: (state, action: PayloadAction<{
+      equipmentId: string;
+    }>) => {
+      try {
+        if (!state.serializedState) return;
+        const gameState = new GameState();
+        gameState.deserialize(state.serializedState);
+        
+        gameState.equipItem(action.payload.equipmentId);
+        state.serializedState = gameState.serialize();
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : 'Failed to equip item';
+      }
+    },
+    unequipItem: (state, action: PayloadAction<{
+      slot: EquipmentSlot;
+    }>) => {
+      try {
+        if (!state.serializedState) return;
+        const gameState = new GameState();
+        gameState.deserialize(state.serializedState);
+        
+        const success = gameState.unequipItem(action.payload.slot);
+        if (success) {
+          state.serializedState = gameState.serialize();
+        } else {
+          state.error = 'Failed to unequip item - inventory may be full';
+        }
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : 'Failed to unequip item';
+      }
     }
   }
 });
@@ -193,7 +286,10 @@ export const {
   moveInventoryItem,
   addInventoryItem,
   removeInventoryItem,
-  addTestItems
+  addTestItems,
+  addTestEquipment,
+  equipItem,
+  unequipItem
 } = gameSlice.actions;
 
 // Selectors

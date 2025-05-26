@@ -25,6 +25,18 @@ const Inventory: React.FC<InventoryProps> = ({ isOpen, onClose }) => {
 
   const playerState = gameState.getPlayerState();
   const inventory = playerState.inventory;
+  
+  // Get items from new InventoryManager
+  const inventoryItems = playerState.inventoryManager.getAllItems();
+  
+  // Convert Equipment items to IInventoryItem format for UI compatibility
+  const legacyInventoryItems: IInventoryItem[] = inventoryItems.map(item => ({
+    id: item.equipment.getId(),
+    name: item.equipment.getName(),
+    type: item.equipment.getType() as 'weapon' | 'armor' | 'consumable' | 'quest',
+    quantity: item.quantity,
+    stats: item.equipment.getStats().bonuses
+  }));
 
   const handleItemHover = (item: IInventoryItem | null, event?: React.MouseEvent) => {
     setHoveredItem(item);
@@ -50,11 +62,11 @@ const Inventory: React.FC<InventoryProps> = ({ isOpen, onClose }) => {
             <div className="inventory-right">
               <div className="inventory-info">
                 <span>Gold: {inventory.gold}</span>
-                <span>Slots: {inventory.items.length}/{inventory.maxSlots}</span>
+                <span>Slots: {inventoryItems.length}/{playerState.inventoryManager.getMaxSlots()}</span>
               </div>
               <InventoryGrid 
-                items={inventory.items}
-                maxSlots={inventory.maxSlots}
+                items={legacyInventoryItems}
+                maxSlots={playerState.inventoryManager.getMaxSlots()}
                 onItemHover={handleItemHover}
               />
             </div>

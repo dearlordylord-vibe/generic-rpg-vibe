@@ -1,6 +1,7 @@
 import { PlayerStats, IBaseStats } from './PlayerStats';
 import { PlayerLevel } from './PlayerLevel';
-import { Equipment } from './Equipment';
+import { Equipment, EquipmentSlot } from './Equipment';
+import { InventoryManager } from './InventoryManager';
 
 // Game state component interfaces
 export interface IPlayerState {
@@ -8,6 +9,7 @@ export interface IPlayerState {
   level: PlayerLevel;
   position: { x: number; y: number };
   inventory: IInventoryState;
+  inventoryManager: InventoryManager;
   quests: IQuestState;
 }
 
@@ -125,6 +127,7 @@ export class GameState {
         gold: 0,
         maxSlots: 20
       },
+      inventoryManager: new InventoryManager(20),
       quests: {
         active: [],
         completed: []
@@ -308,6 +311,60 @@ export class GameState {
     this.equipment = this.equipment.filter(item => item.getId() !== itemId);
   }
 
+  // Equipment management using InventoryManager
+  public equipItem(equipmentId: string): Equipment | null {
+    const previouslyEquipped = this.player.inventoryManager.equipItem(
+      equipmentId, 
+      this.player.stats, 
+      this.player.level
+    );
+    
+    if (previouslyEquipped) {
+      this.emitEvent('inventoryChanged', { 
+        action: 'equipped',
+        item: equipmentId,
+        previouslyEquipped: previouslyEquipped.getId()
+      });
+    }
+    
+    return previouslyEquipped;
+  }
+
+  public unequipItem(slot: EquipmentSlot): boolean {
+    const success = this.player.inventoryManager.unequipItem(slot);
+    
+    if (success) {
+      this.emitEvent('inventoryChanged', { 
+        action: 'unequipped',
+        slot
+      });
+    }
+    
+    return success;
+  }
+
+  public getEquippedItem(slot: EquipmentSlot): Equipment | undefined {
+    return this.player.inventoryManager.getEquippedItem(slot);
+  }
+
+  public getAllEquippedItems() {
+    return this.player.inventoryManager.getAllEquippedItems();
+  }
+
+  public addItemToInventory(equipment: Equipment, quantity: number = 1): boolean {
+    const success = this.player.inventoryManager.addItem(equipment, quantity);
+    
+    if (success) {
+      this.emitEvent('inventoryChanged', { 
+        action: 'added',
+        item: equipment.getId(),
+        quantity
+      });
+    }
+    
+    return success;
+  }
+
   // World state management
   public getWorld(): IWorldState {
     return { ...this.world };
@@ -323,7 +380,8 @@ export class GameState {
       player: {
         ...this.player,
         stats: this.player.stats.serialize(),
-        level: this.player.level.serialize()
+        level: this.player.level.serialize(),
+        inventoryManager: this.player.inventoryManager.serialize()
       },
       world: this.world
     };
@@ -349,6 +407,9 @@ export class GameState {
           gold: 0,
           maxSlots: 20
         },
+        inventoryManager: state.player.inventoryManager 
+          ? InventoryManager.deserialize(state.player.inventoryManager)
+          : new InventoryManager(20),
         quests: state.player.quests || {
           active: [],
           completed: []
