@@ -6,6 +6,7 @@ import { AOEManager } from '../combat/AOEManager';
 import { PlayerStats } from '../models/PlayerStats';
 import { InventoryManager } from '../models/InventoryManager';
 import { FeedbackManager, CombatFeedback } from '../feedback/FeedbackManager';
+import { InputHandler } from '../input/InputHandler';
 
 interface AnimationConfig {
   start: number;
@@ -26,6 +27,7 @@ export default class MainScene extends Scene {
   private projectileManager!: ProjectileManager;
   private aoeManager!: AOEManager;
   private feedbackManager!: FeedbackManager;
+  private inputHandler!: InputHandler;
   private currentProjectileType: string = 'arrow';
   private currentAOEType: string = 'explosion';
   private assetsLoaded: boolean = false;
@@ -140,6 +142,8 @@ export default class MainScene extends Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     
+    this.inputHandler = new InputHandler(this);
+    this.setupInputCallbacks();
     this.setupKeyboardHandlers();
     this.setupMouseControls();
   }
@@ -154,13 +158,25 @@ export default class MainScene extends Scene {
     this.aoeManager = new AOEManager(this);
     this.feedbackManager = new FeedbackManager(this);
     
+    // Add combat combos
+    this.setupCombatCombos();
+    
     // Add a test enemy
     this.addTestEnemy();
   }
 
   private addTestEnemy() {
-    // Create a test enemy sprite
-    const enemySprite = this.add.rectangle(600, 300, 32, 32, 0xff0000);
+    // Create a test enemy sprite using a simple colored sprite
+    // First create a fallback texture for the enemy
+    if (!this.textures.exists('enemy_fallback')) {
+      this.add.graphics()
+        .fillStyle(0xff0000)
+        .fillRect(0, 0, 32, 32)
+        .generateTexture('enemy_fallback', 32, 32)
+        .destroy();
+    }
+    
+    const enemySprite = this.add.sprite(600, 300, 'enemy_fallback');
     enemySprite.setOrigin(0.5, 0.5);
     
     // Create enemy stats
@@ -169,7 +185,253 @@ export default class MainScene extends Scene {
     enemyStats.allocateStatPoint('strength');
     enemyStats.allocateStatPoint('vitality');
     
-    this.combatManager.addEnemy('enemy1', 600, 300, enemyStats, enemySprite as Phaser.GameObjects.Sprite);
+    this.combatManager.addEnemy('enemy1', 600, 300, enemyStats, enemySprite);
+  }
+
+  private setupInputCallbacks() {
+    if (!this.inputHandler) return;
+
+    // Movement callback
+    this.inputHandler.registerCallback('movement', (data) => {
+      const movement = data as { x: number; y: number };
+      this.handleMovement(movement);
+    });
+
+    // Combat action callbacks
+    this.inputHandler.registerCallback('melee', (data) => {
+      const position = data as { x: number; y: number } | undefined;
+      if (position) {
+        this.handleMeleeAttack(position.x, position.y);
+      } else {
+        // Default melee attack at cat position with some range
+        this.handleMeleeAttack(this.cat.x + 50, this.cat.y);
+      }
+    });
+
+    this.inputHandler.registerCallback('projectile', (data) => {
+      const position = data as { x: number; y: number } | undefined;
+      if (position) {
+        this.handleProjectileAttack(position.x, position.y);
+      } else {
+        // Default projectile attack forward
+        this.handleProjectileAttack(this.cat.x + 100, this.cat.y);
+      }
+    });
+
+    this.inputHandler.registerCallback('aoe', (data) => {
+      const position = data as { x: number; y: number } | undefined;
+      if (position) {
+        this.handleAOEAttack(position.x, position.y);
+      } else {
+        // Default AOE at cat position
+        this.handleAOEAttack(this.cat.x, this.cat.y);
+      }
+    });
+
+    this.inputHandler.registerCallback('block', () => {
+      this.handleBlock();
+    });
+
+    this.inputHandler.registerCallback('dodge', () => {
+      this.handleDodge();
+    });
+
+    // Projectile selection callbacks
+    this.inputHandler.registerCallback('select_projectile1', () => {
+      this.currentProjectileType = 'arrow';
+      console.log('Selected arrow projectile');
+    });
+
+    this.inputHandler.registerCallback('select_projectile2', () => {
+      this.currentProjectileType = 'fireball';
+      console.log('Selected fireball projectile');
+    });
+
+    this.inputHandler.registerCallback('select_projectile3', () => {
+      this.currentProjectileType = 'ice';
+      console.log('Selected ice projectile');
+    });
+
+    this.inputHandler.registerCallback('select_projectile4', () => {
+      this.currentProjectileType = 'lightning';
+      console.log('Selected lightning projectile');
+    });
+
+    // AOE selection callbacks
+    this.inputHandler.registerCallback('select_aoe1', () => {
+      this.currentAOEType = 'explosion';
+      console.log('Selected explosion AOE');
+    });
+
+    this.inputHandler.registerCallback('select_aoe2', () => {
+      this.currentAOEType = 'freeze';
+      console.log('Selected freeze AOE');
+    });
+
+    this.inputHandler.registerCallback('select_aoe3', () => {
+      this.currentAOEType = 'poison';
+      console.log('Selected poison AOE');
+    });
+
+    this.inputHandler.registerCallback('select_aoe4', () => {
+      this.currentAOEType = 'heal';
+      console.log('Selected heal AOE');
+    });
+
+    this.inputHandler.registerCallback('select_aoe5', () => {
+      this.currentAOEType = 'shield';
+      console.log('Selected shield AOE');
+    });
+
+    // Combo callbacks
+    this.inputHandler.registerCallback('combo_heavy_strike', () => {
+      this.executeHeavyStrike();
+    });
+
+    this.inputHandler.registerCallback('combo_rapid_fire', () => {
+      this.executeRapidFire();
+    });
+
+    this.inputHandler.registerCallback('combo_defensive_stance', () => {
+      this.executeDefensiveStance();
+    });
+  }
+
+  private setupCombatCombos() {
+    if (!this.inputHandler) return;
+
+    // Heavy Strike: Melee -> Melee -> Melee
+    this.inputHandler.addCombo({
+      id: 'heavy_strike',
+      sequence: ['melee', 'melee', 'melee'],
+      timeWindow: 1500,
+      action: 'combo_heavy_strike'
+    });
+
+    // Rapid Fire: Projectile -> Projectile -> Projectile
+    this.inputHandler.addCombo({
+      id: 'rapid_fire',
+      sequence: ['projectile', 'projectile', 'projectile'],
+      timeWindow: 2000,
+      action: 'combo_rapid_fire'
+    });
+
+    // Defensive Stance: Block -> Dodge -> Block
+    this.inputHandler.addCombo({
+      id: 'defensive_stance',
+      sequence: ['block', 'dodge', 'block'],
+      timeWindow: 3000,
+      action: 'combo_defensive_stance'
+    });
+  }
+
+  private handleMovement(movement: { x: number; y: number }) {
+    if (!this.cat) return;
+
+    const speed = 200;
+    const velocity = {
+      x: movement.x * speed,
+      y: movement.y * speed
+    };
+
+    // Apply movement to cat sprite
+    if (this.cat.body && 'setVelocity' in this.cat.body) {
+      (this.cat.body as Phaser.Physics.Arcade.Body).setVelocity(velocity.x, velocity.y);
+    }
+
+    // Update animation based on movement
+    if (velocity.x !== 0 || velocity.y !== 0) {
+      if (this.cat.anims && this.cat.anims.currentAnim?.key !== 'walk') {
+        this.cat.play('walk');
+      }
+    } else if (this.cat.anims && this.cat.anims.currentAnim?.key !== 'idle') {
+      this.cat.play('idle');
+    }
+  }
+
+  private handleBlock() {
+    if (!this.combatManager) return;
+    
+    const result = this.combatManager.startBlock();
+    if (result) {
+      console.log('Block action started');
+      this.triggerBlockFeedback();
+    }
+  }
+
+  private handleDodge() {
+    if (!this.combatManager) return;
+    
+    const result = this.combatManager.performDodge();
+    if (result) {
+      console.log('Dodge action started');
+      this.triggerDodgeFeedback();
+    }
+  }
+
+  private executeHeavyStrike() {
+    console.log('Executing Heavy Strike combo!');
+    // Perform enhanced melee attack with increased damage
+    if (this.cat) {
+      this.handleMeleeAttack(this.cat.x + 50, this.cat.y);
+      this.triggerComboFeedback('Heavy Strike');
+    }
+  }
+
+  private executeRapidFire() {
+    console.log('Executing Rapid Fire combo!');
+    // Fire multiple projectiles in quick succession
+    if (this.cat) {
+      for (let i = 0; i < 3; i++) {
+        this.time.delayedCall(i * 200, () => {
+          this.handleProjectileAttack(this.cat.x + 100, this.cat.y + (i - 1) * 20);
+        });
+      }
+      this.triggerComboFeedback('Rapid Fire');
+    }
+  }
+
+  private executeDefensiveStance() {
+    console.log('Executing Defensive Stance combo!');
+    // Provide temporary defensive bonuses
+    this.triggerComboFeedback('Defensive Stance');
+  }
+
+  private triggerBlockFeedback() {
+    if (!this.feedbackManager || !this.cat) return;
+
+    const feedback: CombatFeedback = {
+      type: 'block',
+      position: { x: this.cat.x, y: this.cat.y },
+      sourceId: 'player',
+      targetId: 'player'
+    };
+    this.feedbackManager.triggerCombatFeedback(feedback);
+  }
+
+  private triggerDodgeFeedback() {
+    if (!this.feedbackManager || !this.cat) return;
+
+    const feedback: CombatFeedback = {
+      type: 'dodge',
+      position: { x: this.cat.x, y: this.cat.y },
+      sourceId: 'player',
+      targetId: 'player'
+    };
+    this.feedbackManager.triggerCombatFeedback(feedback);
+  }
+
+  private triggerComboFeedback(comboName: string) {
+    if (!this.feedbackManager || !this.cat) return;
+
+    const feedback: CombatFeedback = {
+      type: 'special',
+      position: { x: this.cat.x, y: this.cat.y },
+      sourceId: 'player',
+      targetId: 'player',
+      effect: comboName
+    };
+    this.feedbackManager.triggerCombatFeedback(feedback);
   }
 
   private setupMouseControls() {
@@ -332,7 +594,9 @@ export default class MainScene extends Scene {
           targetId: hit.targetId
         };
         this.feedbackManager.triggerCombatFeedback(hitFeedback);
-        this.triggerEnemyReaction(enemy, 'hit', hit.isCritical);
+        if (enemy.sprite) {
+          this.triggerEnemyReaction({ sprite: enemy.sprite }, 'hit', hit.isCritical);
+        }
       }
     });
   }
@@ -368,7 +632,9 @@ export default class MainScene extends Scene {
 
     // Trigger enemy reaction
     if (result.hit || result.blocked) {
-      this.triggerEnemyReaction(enemy, result.blocked ? 'blocked' : 'hit', result.critical);
+      if (enemy.sprite) {
+        this.triggerEnemyReaction({ sprite: enemy.sprite }, result.blocked ? 'blocked' : 'hit', result.critical);
+      }
     }
 
     // Log to console as well
@@ -570,7 +836,12 @@ export default class MainScene extends Scene {
     if (!this.cursors || !this.cat || !this.animationsCreated) return;
 
     try {
-      this.handleMovement();
+      this.handleCursorMovement();
+      
+      // Update input handler
+      if (this.inputHandler) {
+        this.inputHandler.update();
+      }
       
       // Update combat manager
       if (this.combatManager) {
@@ -597,7 +868,9 @@ export default class MainScene extends Scene {
               targetId: hit.targetId
             };
             this.feedbackManager.triggerCombatFeedback(feedback);
-            this.triggerEnemyReaction(enemy, 'hit', hit.critical);
+            if (enemy.sprite) {
+              this.triggerEnemyReaction({ sprite: enemy.sprite }, 'hit', hit.critical);
+            }
           }
         });
       }
@@ -613,7 +886,7 @@ export default class MainScene extends Scene {
     }
   }
 
-  private handleMovement() {
+  private handleCursorMovement() {
     const speed = 4;
     let newAnimation: AnimationKey = 'idle';
     let shouldFlip = this.cat.flipX;
@@ -663,6 +936,13 @@ export default class MainScene extends Scene {
       }
     } catch (error) {
       console.error('Error in updateGameState:', error);
+    }
+  }
+
+  cleanup() {
+    // Clean up InputHandler
+    if (this.inputHandler) {
+      this.inputHandler.destroy();
     }
   }
 } 

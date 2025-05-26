@@ -12,7 +12,9 @@
       "Bash(npx eslint:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm run test:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

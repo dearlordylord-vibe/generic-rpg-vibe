@@ -9,12 +9,13 @@ export interface FeedbackConfig {
 }
 
 export interface CombatFeedback {
-  type: 'hit' | 'miss' | 'dodge' | 'block' | 'critical' | 'explosion' | 'projectile_hit';
+  type: 'hit' | 'miss' | 'dodge' | 'block' | 'critical' | 'explosion' | 'projectile_hit' | 'special';
   damage?: number;
   isCritical?: boolean;
   position: { x: number; y: number };
   sourceId: string;
   targetId?: string;
+  effect?: string; // For special effects like combo names
 }
 
 export interface AudioEffect {
@@ -178,6 +179,25 @@ export class FeedbackManager {
           intensity: 1.0 
         });
         break;
+
+      case 'special':
+        effects.audio.push({ key: 'combo_special', volume: 0.9 });
+        effects.visual.push({ 
+          type: 'particle', 
+          duration: 600, 
+          intensity: 2.5,
+          color: 0xffaa00 
+        });
+        effects.camera.push({ 
+          type: 'flash', 
+          duration: 300, 
+          intensity: 1.2 
+        });
+        // Add special effect text if provided
+        if (feedback.effect) {
+          this.createSpecialText(feedback);
+        }
+        break;
     }
 
     return effects;
@@ -209,6 +229,36 @@ export class FeedbackManager {
       ease: 'Power2',
       onComplete: () => {
         damageText.destroy();
+      }
+    });
+  }
+
+  private createSpecialText(feedback: CombatFeedback): void {
+    if (!feedback.effect) return;
+
+    const specialText = this.scene.add.text(
+      feedback.position.x,
+      feedback.position.y - 30,
+      feedback.effect,
+      {
+        fontSize: '20px',
+        color: '#ffaa00',
+        stroke: '#000000',
+        strokeThickness: 3,
+        fontStyle: 'bold'
+      }
+    );
+
+    this.scene.tweens.add({
+      targets: specialText,
+      y: feedback.position.y - 80,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Power2',
+      onComplete: () => {
+        specialText.destroy();
       }
     });
   }
@@ -442,7 +492,7 @@ export class ParticleManager {
     });
   }
 
-  private createSpriteEffect(): void {
+  private createSpriteEffect(_effect: VisualEffect, _position: { x: number; y: number }): void {
     // Placeholder for sprite-based effects when textures are available
     console.log('Sprite effect not implemented yet');
   }
