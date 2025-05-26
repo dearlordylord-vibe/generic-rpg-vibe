@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { IDerivedStats, IStatModifier } from '../models/PlayerStats';
+import { EnemyBehaviorTree } from '../ai/EnemyBehaviorTree';
 
 export interface IEnemyStats extends IDerivedStats {
   level: number;
@@ -49,6 +50,8 @@ export abstract class Enemy {
   protected detectionRadius: number;
   protected attackRadius: number;
   protected retreatThreshold: number; // Health percentage to retreat
+  protected behaviorTree: EnemyBehaviorTree | null = null;
+  protected useBehaviorTree: boolean = false;
 
   constructor(
     scene: Scene,
@@ -79,6 +82,7 @@ export abstract class Enemy {
     this.stats = this.initializeStats();
     this.initializeBehaviors();
     this.setupPhysics();
+    this.initializeBehaviorTree();
   }
 
   // Abstract methods that must be implemented by subclasses
@@ -87,6 +91,10 @@ export abstract class Enemy {
   protected abstract initializeBehaviors(): void;
   
   // Virtual methods that can be overridden
+  protected initializeBehaviorTree(): void {
+    // Override in subclasses to set up behavior tree
+    // By default, behavior trees are disabled
+  }
   protected setupPhysics(): void {
     if (this.scene.physics) {
       this.scene.physics.add.existing(this.sprite);
@@ -161,6 +169,28 @@ export abstract class Enemy {
     return false;
   }
 
+  // Behavior Tree management
+  public setBehaviorTree(behaviorTree: EnemyBehaviorTree): void {
+    this.behaviorTree = behaviorTree;
+    this.useBehaviorTree = true;
+  }
+
+  public enableBehaviorTree(): void {
+    this.useBehaviorTree = true;
+  }
+
+  public disableBehaviorTree(): void {
+    this.useBehaviorTree = false;
+  }
+
+  public getBehaviorTree(): EnemyBehaviorTree | null {
+    return this.behaviorTree;
+  }
+
+  public isBehaviorTreeEnabled(): boolean {
+    return this.useBehaviorTree && this.behaviorTree !== null;
+  }
+
   // State management
   public setState(newState: EnemyState): void {
     if (this.state !== newState) {
@@ -212,7 +242,14 @@ export abstract class Enemy {
     if (this.isDead()) return;
 
     this.updateModifiers();
-    this.updateAI(_deltaTime);
+    
+    // Use behavior tree if enabled, otherwise fall back to manual AI
+    if (this.isBehaviorTreeEnabled()) {
+      this.behaviorTree!.update(_deltaTime);
+    } else {
+      this.updateAI(_deltaTime);
+    }
+    
     this.lastUpdate = Date.now();
   }
 
@@ -404,6 +441,26 @@ export abstract class Enemy {
 
   public setTarget(target: Phaser.GameObjects.Sprite | null): void {
     this.target = target;
+  }
+
+  public getBehaviors(): Map<string, IEnemyBehavior> {
+    return this.behaviors;
+  }
+
+  public getDetectionRadius(): number {
+    return this.detectionRadius;
+  }
+
+  public getAttackRadius(): number {
+    return this.attackRadius;
+  }
+
+  public getRetreatThreshold(): number {
+    return this.retreatThreshold;
+  }
+
+  public getSpawnPosition(): { x: number; y: number } {
+    return { ...this.spawnPosition };
   }
 
   // Cleanup
