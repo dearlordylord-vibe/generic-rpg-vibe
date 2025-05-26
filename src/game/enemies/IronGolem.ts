@@ -125,6 +125,132 @@ export class IronGolem extends Enemy {
     });
   }
 
+  protected playDeathAnimation(): void {
+    const sprite = this.getSprite();
+    
+    // Iron Golem death: mechanical breakdown and explosion
+    
+    // Stop any existing tweens
+    this.scene.tweens.killTweensOf(sprite);
+    
+    // Screen shake for massive golem collapse
+    this.scene.cameras.main.shake(1000, 0.06);
+    
+    // Sparks and electrical discharge
+    for (let i = 0; i < 20; i++) {
+      this.scene.time.delayedCall(i * 50, () => {
+        const spark = this.scene.add.circle(
+          sprite.x + (Math.random() - 0.5) * 50,
+          sprite.y + (Math.random() - 0.5) * 50,
+          2, 0xffff44, 0.9
+        );
+        
+        this.scene.tweens.add({
+          targets: spark,
+          x: spark.x + (Math.random() - 0.5) * 60,
+          y: spark.y + (Math.random() - 0.5) * 60,
+          alpha: 0,
+          duration: 400,
+          ease: 'Power2.easeOut',
+          onComplete: () => spark.destroy()
+        });
+      });
+    }
+    
+    // Metal fragments scattering
+    for (let i = 0; i < 15; i++) {
+      this.scene.time.delayedCall(200 + i * 80, () => {
+        const fragment = this.scene.add.circle(
+          sprite.x + (Math.random() - 0.5) * 30,
+          sprite.y + (Math.random() - 0.5) * 30,
+          4, 0x666666, 0.8
+        );
+        
+        const angle = Math.random() * Math.PI * 2;
+        const force = 80 + Math.random() * 40;
+        
+        this.scene.tweens.add({
+          targets: fragment,
+          x: sprite.x + Math.cos(angle) * force,
+          y: sprite.y + Math.sin(angle) * force,
+          rotation: Math.random() * Math.PI * 4,
+          alpha: 0,
+          duration: 1200,
+          ease: 'Power2.easeOut',
+          onComplete: () => fragment.destroy()
+        });
+      });
+    }
+    
+    // Steam/smoke eruption
+    for (let i = 0; i < 12; i++) {
+      this.scene.time.delayedCall(300 + i * 100, () => {
+        const steam = this.scene.add.circle(
+          sprite.x + (Math.random() - 0.5) * 40,
+          sprite.y + (Math.random() - 0.5) * 40,
+          3, 0xcccccc, 0.6
+        );
+        
+        this.scene.tweens.add({
+          targets: steam,
+          y: steam.y - 60 - Math.random() * 30,
+          x: steam.x + (Math.random() - 0.5) * 40,
+          alpha: 0,
+          scale: 2.5,
+          duration: 2000,
+          ease: 'Power1.easeOut',
+          onComplete: () => steam.destroy()
+        });
+      });
+    }
+    
+    // Golem collapse animation
+    this.scene.tweens.add({
+      targets: sprite,
+      scaleY: 0.3, // Collapse vertically
+      scaleX: 1.4, // Spread horizontally
+      alpha: 0.7,
+      rotation: Math.PI * 0.1,
+      duration: 800,
+      ease: 'Power3.easeIn',
+      onComplete: () => {
+        // Final explosion effect
+        const explosion = this.scene.add.circle(sprite.x, sprite.y, 20, 0xff6600, 0.8);
+        this.scene.tweens.add({
+          targets: explosion,
+          radius: 60,
+          alpha: 0,
+          duration: 500,
+          ease: 'Power3.easeOut',
+          onComplete: () => explosion.destroy()
+        });
+        
+        // Final fade
+        this.scene.tweens.add({
+          targets: sprite,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => sprite.setVisible(false)
+        });
+      }
+    });
+    
+    // Ground impact crater effect
+    this.scene.time.delayedCall(800, () => {
+      const crater = this.scene.add.circle(sprite.x, sprite.y, 5, 0x654321, 0);
+      crater.setStrokeStyle(4, 0x654321, 0.7);
+      
+      this.scene.tweens.add({
+        targets: crater,
+        radius: 45,
+        alpha: 0,
+        duration: 1000,
+        ease: 'Power2.easeOut',
+        onComplete: () => crater.destroy()
+      });
+    });
+  }
+
   private performTaunt(target: Phaser.GameObjects.Sprite): void {
     // Create taunt visual effect
     this.createTauntEffect();

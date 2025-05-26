@@ -116,6 +116,93 @@ export class Wraith extends Enemy {
     });
   }
 
+  protected playDeathAnimation(): void {
+    const sprite = this.getSprite();
+    
+    // Wraith-specific death: ethereal dissolution
+    
+    // Stop any existing tweens
+    this.scene.tweens.killTweensOf(sprite);
+    
+    // Expanding ethereal ring
+    const etherealRing = this.scene.add.circle(sprite.x, sprite.y, 10, 0x9966ff, 0);
+    etherealRing.setStrokeStyle(3, 0x9966ff, 0.8);
+    
+    this.scene.tweens.add({
+      targets: etherealRing,
+      radius: 50,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Power2.easeOut',
+      onComplete: () => etherealRing.destroy()
+    });
+    
+    // Spirit essence escaping upward
+    for (let i = 0; i < 15; i++) {
+      this.scene.time.delayedCall(i * 80, () => {
+        const essence = this.scene.add.circle(
+          sprite.x + (Math.random() - 0.5) * 30,
+          sprite.y + (Math.random() - 0.5) * 30,
+          2, 0xccccff, 0.9
+        );
+        
+        this.scene.tweens.add({
+          targets: essence,
+          y: essence.y - 80 - Math.random() * 40,
+          x: essence.x + (Math.random() - 0.5) * 20,
+          alpha: 0,
+          scale: 0.3,
+          duration: 1500,
+          ease: 'Power1.easeOut',
+          onComplete: () => essence.destroy()
+        });
+      });
+    }
+    
+    // Wraith sprite phase-out effect
+    this.scene.tweens.add({
+      targets: sprite,
+      alpha: 0,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      rotation: Math.PI * 0.5,
+      duration: 1200,
+      ease: 'Power2.easeOut',
+      onComplete: () => {
+        sprite.setVisible(false);
+      }
+    });
+    
+    // Ethereal whisper effect (visual representation)
+    const whisperEffect = this.scene.add.graphics();
+    whisperEffect.lineStyle(2, 0x9966ff, 0.6);
+    
+    // Create swirling whisper lines
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      this.scene.time.delayedCall(i * 100, () => {
+        whisperEffect.clear();
+        const startX = sprite.x + Math.cos(angle) * 20;
+        const startY = sprite.y + Math.sin(angle) * 20;
+        
+        whisperEffect.beginPath();
+        whisperEffect.arc(startX, startY, 15, angle, angle + Math.PI);
+        whisperEffect.strokePath();
+        
+        this.scene.tweens.add({
+          targets: whisperEffect,
+          alpha: 0,
+          duration: 800,
+          onComplete: () => {
+            if (i === 4) { // Last whisper
+              whisperEffect.destroy();
+            }
+          }
+        });
+      });
+    }
+  }
+
   private performLifeDrain(target: Phaser.GameObjects.Sprite): void {
     // Consume mana
     this.stats.currentMana = Math.max(0, this.stats.currentMana - 20);

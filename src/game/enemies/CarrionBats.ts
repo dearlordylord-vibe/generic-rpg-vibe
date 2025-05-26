@@ -171,6 +171,127 @@ export class CarrionBats extends Enemy {
     this.sprite.y = this.baseY - this.flightHeight;
   }
 
+  protected playDeathAnimation(): void {
+    const sprite = this.getSprite();
+    
+    // Carrion Bat death: falling from sky with feathers
+    
+    // Stop any existing tweens
+    this.scene.tweens.killTweensOf(sprite);
+    
+    // Death screech effect (visual representation)
+    const screechRing = this.scene.add.circle(sprite.x, sprite.y, 5, 0x8B4513, 0);
+    screechRing.setStrokeStyle(2, 0x8B4513, 0.6);
+    
+    this.scene.tweens.add({
+      targets: screechRing,
+      radius: 30,
+      alpha: 0,
+      duration: 400,
+      ease: 'Power2.easeOut',
+      onComplete: () => screechRing.destroy()
+    });
+    
+    // Feathers scattering
+    for (let i = 0; i < 12; i++) {
+      this.scene.time.delayedCall(i * 50, () => {
+        const feather = this.scene.add.circle(
+          sprite.x + (Math.random() - 0.5) * 20,
+          sprite.y + (Math.random() - 0.5) * 20,
+          1, 0x8B4513, 0.8
+        );
+        
+        this.scene.tweens.add({
+          targets: feather,
+          x: feather.x + (Math.random() - 0.5) * 50,
+          y: feather.y + 60 + Math.random() * 40, // Fall down
+          rotation: Math.random() * Math.PI * 4,
+          alpha: 0,
+          duration: 2000,
+          ease: 'Power1.easeOut',
+          onComplete: () => feather.destroy()
+        });
+      });
+    }
+    
+    // Blood splatter (for carrion nature)
+    for (let i = 0; i < 6; i++) {
+      const bloodDrop = this.scene.add.circle(
+        sprite.x + (Math.random() - 0.5) * 15,
+        sprite.y + (Math.random() - 0.5) * 15,
+        2, 0x8B0000, 0.7
+      );
+      
+      this.scene.tweens.add({
+        targets: bloodDrop,
+        y: bloodDrop.y + 30 + Math.random() * 20,
+        x: bloodDrop.x + (Math.random() - 0.5) * 20,
+        alpha: 0,
+        scale: 0.3,
+        duration: 1000,
+        ease: 'Power2.easeOut',
+        onComplete: () => bloodDrop.destroy()
+      });
+    }
+    
+    // Bat falling animation
+    this.scene.tweens.add({
+      targets: sprite,
+      y: sprite.y + 100, // Fall to ground
+      rotation: Math.PI * 3, // Tumbling fall
+      scaleX: 0.6,
+      scaleY: 0.6,
+      alpha: 0.3,
+      duration: 1200,
+      ease: 'Power2.easeIn',
+      onComplete: () => {
+        // Impact with ground effect
+        const impactDust = this.scene.add.circle(sprite.x, sprite.y, 8, 0xcccccc, 0.5);
+        this.scene.tweens.add({
+          targets: impactDust,
+          radius: 20,
+          alpha: 0,
+          duration: 300,
+          ease: 'Power2.easeOut',
+          onComplete: () => impactDust.destroy()
+        });
+        
+        // Final fade
+        this.scene.tweens.add({
+          targets: sprite,
+          alpha: 0,
+          duration: 500,
+          onComplete: () => sprite.setVisible(false)
+        });
+      }
+    });
+    
+    // If this is a swarm leader, create special death effect
+    if (this.isSwarmLeader) {
+      this.scene.time.delayedCall(200, () => {
+        // Dark energy release from leader
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const darkEnergy = this.scene.add.circle(
+            sprite.x, sprite.y,
+            3, 0x4B0082, 0.8
+          );
+          
+          this.scene.tweens.add({
+            targets: darkEnergy,
+            x: sprite.x + Math.cos(angle) * 40,
+            y: sprite.y + Math.sin(angle) * 40,
+            alpha: 0,
+            scale: 0.3,
+            duration: 800,
+            ease: 'Power2.easeOut',
+            onComplete: () => darkEnergy.destroy()
+          });
+        }
+      });
+    }
+  }
+
   private createFlightAnimation(): void {
     // Wing flapping animation (simulated with scale changes)
     this.scene.tweens.add({

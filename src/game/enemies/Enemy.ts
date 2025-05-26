@@ -234,7 +234,55 @@ export abstract class Enemy {
   protected die(): void {
     this.setState('dead');
     this.target = null;
+    this.playDeathAnimation();
     this.emitEvent('died', { enemy: this, experienceReward: this.stats.experienceReward });
+  }
+
+  protected playDeathAnimation(): void {
+    // Generic death animation that can be overridden by subclasses
+    const sprite = this.getSprite();
+    
+    // Fade out and shrink effect
+    this.scene.tweens.add({
+      targets: sprite,
+      alpha: 0,
+      scaleX: 0.5,
+      scaleY: 0.5,
+      rotation: Math.PI * 2,
+      duration: 800,
+      ease: 'Power2.easeIn',
+      onComplete: () => {
+        // Don't destroy sprite immediately, let the scene handle cleanup
+        sprite.setVisible(false);
+      }
+    });
+
+    // Generic death particles
+    this.createDeathParticles();
+  }
+
+  protected createDeathParticles(): void {
+    const sprite = this.getSprite();
+    const particleCount = 12;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (i / particleCount) * Math.PI * 2;
+      const particle = this.scene.add.circle(
+        sprite.x, sprite.y,
+        3, 0x888888, 0.8
+      );
+      
+      this.scene.tweens.add({
+        targets: particle,
+        x: sprite.x + Math.cos(angle) * 30,
+        y: sprite.y + Math.sin(angle) * 30,
+        alpha: 0,
+        scale: 0.3,
+        duration: 600,
+        ease: 'Power2.easeOut',
+        onComplete: () => particle.destroy()
+      });
+    }
   }
 
   // AI/Update methods
