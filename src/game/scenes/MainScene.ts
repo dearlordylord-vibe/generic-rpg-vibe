@@ -131,8 +131,7 @@ export default class MainScene extends Scene {
         key: 'fallback',
         frames: [{ key: 'cat', frame: 0 }],
         frameRate: 1,
-        repeat: -1,
-        duration: 1000
+        repeat: -1
       });
     }
     this.cat.play('fallback');
@@ -158,6 +157,7 @@ export default class MainScene extends Scene {
     this.combatManager = new CombatManager(this, playerStats, inventoryManager);
     this.projectileManager = new ProjectileManager(this);
     this.aoeManager = new AOEManager(this);
+    this.aoeManager.setCombatManager(this.combatManager);
     this.feedbackManager = new FeedbackManager(this);
     
     // Add combat combos
@@ -338,7 +338,7 @@ export default class MainScene extends Scene {
     }
   }
 
-  private enemyAttackPlayer(enemyId: string, enemySprite: Phaser.GameObjects.Sprite) {
+  private enemyAttackPlayer(enemyId: string, _enemySprite: Phaser.GameObjects.Sprite) {
     if (!this.cat || !this.combatManager) return;
     
     const enemy = this.combatManager.getEnemy(enemyId);
@@ -711,26 +711,26 @@ export default class MainScene extends Scene {
     });
 
     this.inputHandler.registerCallback('select_aoe2', () => {
-      this.currentAOEType = 'freeze';
-      console.log('Selected freeze AOE');
+      this.currentAOEType = 'magic_circle';
+      console.log('Selected magic circle AOE');
       this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     this.inputHandler.registerCallback('select_aoe3', () => {
-      this.currentAOEType = 'poison';
-      console.log('Selected poison AOE');
+      this.currentAOEType = 'shockwave';
+      console.log('Selected shockwave AOE');
       this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     this.inputHandler.registerCallback('select_aoe4', () => {
-      this.currentAOEType = 'heal';
-      console.log('Selected heal AOE');
+      this.currentAOEType = 'ice_storm';
+      console.log('Selected ice storm AOE');
       this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     this.inputHandler.registerCallback('select_aoe5', () => {
-      this.currentAOEType = 'shield';
-      console.log('Selected shield AOE');
+      this.currentAOEType = 'lightning_strike';
+      console.log('Selected lightning strike AOE');
       this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
@@ -908,19 +908,23 @@ export default class MainScene extends Scene {
     }
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.handleMouseClick(pointer.x, pointer.y, pointer.rightButtonDown(), pointer.middleButtonDown());
+      const isShiftHeld = this.input.keyboard?.checkDown(this.input.keyboard.addKey('SHIFT'));
+      this.handleMouseClick(pointer.x, pointer.y, pointer.rightButtonDown(), pointer.middleButtonDown(), isShiftHeld);
     });
   }
 
-  private handleMouseClick(x: number, y: number, isRightClick: boolean = false, isMiddleClick: boolean = false) {
+  private handleMouseClick(x: number, y: number, isRightClick: boolean = false, isMiddleClick: boolean = false, isShiftHeld: boolean = false) {
     if (!this.combatManager || !this.projectileManager || !this.aoeManager) return;
 
     if (isMiddleClick) {
-      // Middle click for AOE attacks
+      // Middle click for AOE attacks (legacy support)
       this.handleAOEAttack(x, y);
     } else if (isRightClick) {
       // Right click for projectile attacks
       this.handleProjectileAttack(x, y);
+    } else if (isShiftHeld) {
+      // Shift + left click for AOE attacks
+      this.handleAOEAttack(x, y);
     } else {
       // Left click for melee attacks
       this.handleMeleeAttack(x, y);
@@ -1300,12 +1304,39 @@ export default class MainScene extends Scene {
   }
 
   private createAnimation(key: AnimationKey, config: AnimationConfig) {
-    this.anims.create({
-      key,
-      frames: this.anims.generateFrameNumbers('cat', { start: config.start, end: config.end }),
-      frameRate: config.frameRate,
-      repeat: -1
-    });
+    try {
+      // Check if the texture has enough frames
+      const texture = this.textures.get('cat');
+      const frameCount = texture?.frameTotal || 1;
+      
+      if (config.end >= frameCount) {
+        console.warn(`Animation '${key}' requires frame ${config.end} but texture only has ${frameCount} frames. Using single frame.`);
+        // Create single-frame animation
+        this.anims.create({
+          key,
+          frames: [{ key: 'cat', frame: 0 }],
+          frameRate: config.frameRate,
+          repeat: -1
+        });
+      } else {
+        // Create multi-frame animation
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers('cat', { start: config.start, end: config.end }),
+          frameRate: config.frameRate,
+          repeat: -1
+        });
+      }
+    } catch (error) {
+      console.error(`Error creating animation '${key}':`, error);
+      // Fallback to single frame
+      this.anims.create({
+        key,
+        frames: [{ key: 'cat', frame: 0 }],
+        frameRate: 1,
+        repeat: -1
+      });
+    }
   }
 
   private createFallbackAnimations() {
@@ -1315,8 +1346,7 @@ export default class MainScene extends Scene {
           key,
           frames: [{ key: 'cat', frame: 0 }],
           frameRate: 1,
-          repeat: -1,
-          duration: 1000
+          repeat: -1
         });
       }
     });
@@ -1424,10 +1454,29 @@ export default class MainScene extends Scene {
   }
 
   private updateAnimation(newAnimation: AnimationKey) {
-    if (!this.anims.exists(newAnimation)) return;
+    if (!this.anims.exists(newAnimation)) {
+      console.warn(`Animation '${newAnimation}' does not exist.`);
+      // Try to create animations if they don't exist
+      if (!this.animationsCreated && this.assetsLoaded) {
+        this.createAnimations();
+      }
+      // Use fallback animation
+      if (this.anims.exists('fallback')) {
+        this.cat.play('fallback', true);
+      }
+      return;
+    }
 
     if (!this.cat.anims.currentAnim || this.cat.anims.currentAnim.key !== newAnimation) {
-      this.cat.play(newAnimation, true);
+      try {
+        this.cat.play(newAnimation, true);
+      } catch (error) {
+        console.error(`Error playing animation '${newAnimation}':`, error);
+        // Fallback to static frame
+        if (this.anims.exists('fallback')) {
+          this.cat.play('fallback', true);
+        }
+      }
     }
   }
 

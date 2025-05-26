@@ -34,6 +34,7 @@ export interface AOETarget {
   y: number;
   health: number;
   defense: number;
+  enemy?: Phaser.GameObjects.Sprite; // Reference to actual enemy sprite
 }
 
 export interface AOEResult {
@@ -54,6 +55,7 @@ export class AOEManager {
   private activeEffects: Map<string, AOEEffect>;
   private aoeTypes: Map<string, AOEType>;
   private nextEffectId: number;
+  private combatManager?: any; // Reference to combat manager
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -61,6 +63,10 @@ export class AOEManager {
     this.aoeTypes = new Map();
     this.nextEffectId = 1;
     this.initializeAOETypes();
+  }
+
+  setCombatManager(combatManager: any): void {
+    this.combatManager = combatManager;
   }
 
   private initializeAOETypes(): void {
@@ -252,14 +258,21 @@ export class AOEManager {
 
         const isCritical = Math.random() < 0.1; // 10% critical chance
 
+        const actualDamage = isCritical ? finalDamage * 2 : finalDamage;
+        
         targetsHit.push({
           targetId: target.id,
-          damage: isCritical ? finalDamage * 2 : finalDamage,
+          damage: actualDamage,
           isCritical,
           distance
         });
 
-        this.createDamageNumber(target.x, target.y, finalDamage, isCritical);
+        // Apply real damage to the enemy
+        if (target.enemy && this.combatManager) {
+          this.combatManager.applyDamageToEnemy(target.id, actualDamage);
+        }
+
+        this.createDamageNumber(target.x, target.y, actualDamage, isCritical);
       }
     });
 
@@ -273,16 +286,27 @@ export class AOEManager {
   }
 
   private getTargetsInArea(centerX: number, centerY: number, radius: number): AOETarget[] {
-    const mockTargets: AOETarget[] = [
-      { id: 'enemy1', x: centerX + 50, y: centerY + 30, health: 100, defense: 10 },
-      { id: 'enemy2', x: centerX - 40, y: centerY - 20, health: 80, defense: 15 },
-      { id: 'player', x: centerX + 200, y: centerY + 100, health: 120, defense: 20 }
-    ];
+    const targets: AOETarget[] = [];
 
-    return mockTargets.filter(target => {
-      const distance = Phaser.Math.Distance.Between(centerX, centerY, target.x, target.y);
-      return distance <= radius;
-    });
+    // Get real enemies from combat manager
+    if (this.combatManager) {
+      const enemies = this.combatManager.getAllEnemies();
+      enemies.forEach((enemy: any) => {
+        const distance = Phaser.Math.Distance.Between(centerX, centerY, enemy.x, enemy.y);
+        if (distance <= radius) {
+          targets.push({
+            id: enemy.name || 'enemy',
+            x: enemy.x,
+            y: enemy.y,
+            health: enemy.health,
+            defense: enemy.defense || 0,
+            enemy: enemy // Store reference to actual enemy
+          });
+        }
+      });
+    }
+
+    return targets;
   }
 
   private createDamageNumber(x: number, y: number, damage: number, isCritical: boolean): void {
