@@ -75,6 +75,60 @@ export class CombatManager {
     this.enemies.delete(id);
   }
 
+  // Get enemy by ID
+  getEnemy(id: string): CombatTarget | undefined {
+    return this.enemies.get(id);
+  }
+
+  // Apply damage to player
+  damagePlayer(damage: number): void {
+    // Update both the combat manager's copy and the original stats
+    this.player.currentHealth = Math.max(0, this.player.currentHealth - damage);
+    
+    // Update the player stats object as well so it persists
+    if (this.player.stats) {
+      this.player.stats.modifyHealth(-damage);
+      // Sync the combat manager's health with the updated stats
+      this.player.currentHealth = this.player.stats.getDerivedStats().currentHealth;
+    }
+  }
+
+  // Get player stats
+  getPlayerStats(): PlayerStats {
+    return this.player.stats;
+  }
+
+  // Get player current health
+  getPlayerCurrentHealth(): number {
+    return this.player.currentHealth;
+  }
+
+  // Get all targets (enemies only, since projectiles shouldn't hit the player)
+  getAllTargets(): CombatTarget[] {
+    return Array.from(this.enemies.values());
+  }
+
+  // Get enemy info for projectile hits (returns full CombatTarget)
+  getEnemyInfo(enemyId: string): CombatTarget | undefined {
+    return this.enemies.get(enemyId);
+  }
+
+  // Apply damage to specific enemy (used by projectiles and AOE)
+  applyDamageToEnemy(enemyId: string, damage: number): void {
+    const enemy = this.enemies.get(enemyId);
+    if (enemy) {
+      this.applyDamage(enemy, damage);
+    }
+  }
+
+  // Update player stats (used when Redux state changes)
+  updatePlayerStats(newPlayerStats: PlayerStats): void {
+    const derivedStats = newPlayerStats.getDerivedStats();
+    this.player.stats = newPlayerStats;
+    this.player.currentHealth = derivedStats.currentHealth;
+    this.player.maxHealth = derivedStats.maxHealth;
+  }
+
   // Update player position
   updatePlayerPosition(x: number, y: number): void {
     this.player.x = x;
@@ -313,28 +367,9 @@ export class CombatManager {
     return { ...this.player };
   }
 
-  // Get enemy info
-  getEnemyInfo(id: string): CombatTarget | undefined {
-    const enemy = this.enemies.get(id);
-    return enemy ? { ...enemy } : undefined;
-  }
-
   // Get all enemies
   getAllEnemies(): CombatTarget[] {
     return Array.from(this.enemies.values()).map(enemy => ({ ...enemy }));
-  }
-
-  // Get all targets (player + enemies) for projectile collision detection
-  getAllTargets(): CombatTarget[] {
-    const targets: CombatTarget[] = [];
-    targets.push({ ...this.player });
-    targets.push(...this.getAllEnemies());
-    return targets;
-  }
-
-  // Get player stats for AOE damage calculation
-  getPlayerStats(): PlayerStats {
-    return this.player.stats;
   }
 
   // Update combat state (call in scene update)

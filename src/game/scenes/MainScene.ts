@@ -33,8 +33,6 @@ export default class MainScene extends Scene {
   private assetsLoaded: boolean = false;
   private animationsCreated: boolean = false;
   private enemyHealthBars: Map<string, Phaser.GameObjects.Container> = new Map();
-  private isBlocking: boolean = false;
-  private isDodging: boolean = false;
   private readonly ANIMATION_CONFIG: AnimationConfigs = {
     idle: { start: 0, end: 3, frameRate: 8, duration: 500 },
     walk: { start: 4, end: 7, frameRate: 12, duration: 400 }
@@ -152,7 +150,7 @@ export default class MainScene extends Scene {
   }
 
   private initializeCombat() {
-    // Initialize with basic player stats
+    // Initialize with basic player stats (will be replaced by Redux stats)
     const playerStats = new PlayerStats();
     const inventoryManager = new InventoryManager();
     
@@ -233,6 +231,13 @@ export default class MainScene extends Scene {
     const enemySprite = this.add.sprite(x, y, type);
     enemySprite.setOrigin(0.5, 0.5);
     
+    // Add physics body to enemy for collision detection
+    this.physics.add.existing(enemySprite);
+    (enemySprite.body as Phaser.Physics.Arcade.Body).setCollideWorldBounds(true);
+    
+    // Store enemy ID on sprite for reference
+    (enemySprite as any).enemyId = enemyId;
+    
     // Create enemy stats based on type
     const enemyStats = this.createEnemyStats(type);
     
@@ -278,26 +283,45 @@ export default class MainScene extends Scene {
   }
 
   private addEnemyAI(enemyId: string, sprite: Phaser.GameObjects.Sprite, type: string) {
-    // Simple AI: move toward player periodically
+    // Simple AI: move toward player periodically and attack when in range
     this.time.addEvent({
       delay: 2000 + Math.random() * 3000, // Random delay between 2-5 seconds
       callback: () => {
         if (!this.cat || !sprite.active) return;
         
-        const speed = this.getEnemySpeed(type);
-        const angle = Phaser.Math.Angle.Between(sprite.x, sprite.y, this.cat.x, this.cat.y);
+        // Check if enemy still exists (not dead)
+        const enemy = this.combatManager.getEnemy(enemyId);
+        if (!enemy) {
+          // Enemy is dead, remove sprite and stop AI
+          sprite.destroy();
+          return;
+        }
         
-        // Move toward player
-        this.tweens.add({
-          targets: sprite,
-          x: sprite.x + Math.cos(angle) * speed,
-          y: sprite.y + Math.sin(angle) * speed,
-          duration: 1000,
-          ease: 'Power1'
-        });
+        const distanceToPlayer = Phaser.Math.Distance.Between(sprite.x, sprite.y, this.cat.x, this.cat.y);
+        
+        // If close enough, attack the player
+        if (distanceToPlayer <= 80) { // Melee range
+          this.enemyAttackPlayer(enemyId, sprite);
+        } else {
+          // Move toward player
+          const speed = this.getEnemySpeed(type);
+          const angle = Phaser.Math.Angle.Between(sprite.x, sprite.y, this.cat.x, this.cat.y);
+          
+          this.tweens.add({
+            targets: sprite,
+            x: sprite.x + Math.cos(angle) * speed,
+            y: sprite.y + Math.sin(angle) * speed,
+            duration: 1000,
+            ease: 'Power1'
+          });
+        }
 
-        // Update health bar position
-        this.updateEnemyHealthBar(enemyId, undefined, sprite.x, sprite.y);
+        // Update health bar position and get current health from combat manager
+        const currentHealth = enemy ? enemy.currentHealth : undefined;
+        this.updateEnemyHealthBar(enemyId, currentHealth, sprite.x, sprite.y);
+        
+        // Update enemy position in combat manager
+        this.combatManager.updateEnemyPosition(enemyId, sprite.x, sprite.y);
       },
       callbackScope: this,
       loop: true
@@ -311,6 +335,47 @@ export default class MainScene extends Scene {
       case 'carrion_bat': return 100; // Very fast
       default: return 50;            // Medium speed
     }
+  }
+
+  private enemyAttackPlayer(enemyId: string, enemySprite: Phaser.GameObjects.Sprite) {
+    if (!this.cat || !this.combatManager) return;
+    
+    const enemy = this.combatManager.getEnemy(enemyId);
+    if (!enemy) return;
+    
+    // Calculate damage based on enemy stats
+    const enemyStats = enemy.stats.getDerivedStats();
+    const baseDamage = enemyStats.physicalDamage;
+    const damage = Math.max(1, Math.floor(baseDamage * (0.8 + Math.random() * 0.4))); // 80-120% of base damage
+    
+    // Apply damage to player
+    const playerHealthBefore = this.combatManager.getPlayerCurrentHealth();
+    this.combatManager.damagePlayer(damage);
+    
+    // Get updated player health
+    const playerCurrentHealth = this.combatManager.getPlayerCurrentHealth();
+    const playerMaxHealth = this.combatManager.getPlayerStats().getDerivedStats().maxHealth;
+    
+    console.log(`Player took ${damage} damage: ${playerHealthBefore} -> ${playerCurrentHealth} / ${playerMaxHealth}`);
+    
+    // Show damage feedback on player
+    this.createFloatingDamageText(this.cat.x, this.cat.y - 20, damage, false);
+    
+    // Update HUD with new player health
+    this.events.emit('hudUpdate', { 
+      playerHealth: playerCurrentHealth,
+      maxHealth: playerMaxHealth 
+    });
+    
+    // Visual attack feedback
+    this.add.circle(enemySprite.x, enemySprite.y, 20, 0xff0000, 0.5)
+      .setDepth(1000);
+    
+    this.time.delayedCall(200, () => {
+      // Remove attack visual after 200ms
+    });
+    
+    console.log(`Enemy ${enemyId} attacked player for ${damage} damage`);
   }
 
   private addVillagePortal() {
@@ -506,7 +571,7 @@ export default class MainScene extends Scene {
     this.enemyHealthBars.set(enemyId, container);
   }
 
-  private updateEnemyHealthBar(enemyId: string, currentHealth: number, x?: number, y?: number) {
+  private updateEnemyHealthBar(enemyId: string, currentHealth?: number, x?: number, y?: number) {
     const healthBar = this.enemyHealthBars.get(enemyId);
     if (!healthBar) return;
     
@@ -514,6 +579,9 @@ export default class MainScene extends Scene {
     if (x !== undefined && y !== undefined) {
       healthBar.setPosition(x, y - 40);
     }
+    
+    // Skip health update if currentHealth is not provided
+    if (currentHealth === undefined) return;
     
     // Update health fill
     const maxHealth = (healthBar as any).maxHealth;
@@ -748,13 +816,11 @@ export default class MainScene extends Scene {
     const result = this.combatManager.startBlock();
     if (result) {
       console.log('Block action started');
-      this.isBlocking = true;
       this.events.emit('hudUpdate', { isBlocking: true });
       this.triggerBlockFeedback();
       
       // Auto-stop blocking after 1 second
       this.time.delayedCall(1000, () => {
-        this.isBlocking = false;
         this.events.emit('hudUpdate', { isBlocking: false });
       });
     }
@@ -766,13 +832,11 @@ export default class MainScene extends Scene {
     const result = this.combatManager.performDodge();
     if (result) {
       console.log('Dodge action started');
-      this.isDodging = true;
       this.events.emit('hudUpdate', { isDodging: true });
       this.triggerDodgeFeedback();
       
       // Auto-stop dodging after 500ms
       this.time.delayedCall(500, () => {
-        this.isDodging = false;
         this.events.emit('hudUpdate', { isDodging: false });
       });
     }
@@ -844,6 +908,15 @@ export default class MainScene extends Scene {
   }
 
   private setupMouseControls() {
+    // Disable context menu on the game canvas
+    const canvas = this.sys.game.canvas;
+    if (canvas) {
+      canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        return false;
+      });
+    }
+
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.handleMouseClick(pointer.x, pointer.y, pointer.rightButtonDown(), pointer.middleButtonDown());
     });
@@ -981,6 +1054,53 @@ export default class MainScene extends Scene {
     });
   }
 
+  private showAttackFeedback(result: { hit: boolean; damage: number; critical: boolean; targetId: string; dodged: boolean; blocked: boolean }) {
+    if (!result.hit) return;
+    
+    // Get the target enemy to show feedback at their position
+    const enemy = this.combatManager.getEnemy(result.targetId);
+    if (!enemy || !enemy.sprite) return;
+    
+    // Show floating damage text
+    this.createFloatingDamageText(enemy.sprite.x, enemy.sprite.y, result.damage, result.critical);
+    
+    // Update enemy health bar
+    this.updateEnemyHealthBar(result.targetId, enemy.currentHealth);
+    
+    // Remove enemy if dead
+    if (enemy.currentHealth <= 0) {
+      this.removeEnemyFromScene(result.targetId);
+    }
+    
+    // Show combat feedback
+    if (this.feedbackManager) {
+      const feedback: CombatFeedback = {
+        type: 'attack',
+        position: { x: enemy.sprite.x, y: enemy.sprite.y },
+        sourceId: 'player',
+        targetId: result.targetId,
+        damage: result.damage,
+        isCritical: result.critical
+      };
+      this.feedbackManager.triggerCombatFeedback(feedback);
+    }
+  }
+
+  private removeEnemyFromScene(enemyId: string) {
+    // Remove health bar
+    const healthBar = this.enemyHealthBars.get(enemyId);
+    if (healthBar) {
+      healthBar.destroy();
+      this.enemyHealthBars.delete(enemyId);
+    }
+    
+    // Remove enemy sprite
+    const enemy = this.combatManager.getEnemy(enemyId);
+    if (enemy && enemy.sprite) {
+      enemy.sprite.destroy();
+    }
+  }
+
   private showAOEFeedback(result: { centerX: number; centerY: number; targetsHit: Array<{ targetId: string; damage: number; isCritical: boolean }> }) {
     // Trigger AOE explosion feedback
     const explosionFeedback: CombatFeedback = {
@@ -1020,70 +1140,24 @@ export default class MainScene extends Scene {
     });
   }
 
-  private showAttackFeedback(result: { hit: boolean; blocked: boolean; dodged: boolean; critical: boolean; damage?: number; targetId: string }) {
-    // Find the target enemy to show feedback on
-    const enemy = this.combatManager.getEnemyInfo(result.targetId);
-    if (!enemy || !enemy.sprite) return;
 
-    // Create feedback object for the FeedbackManager
-    let feedbackType: CombatFeedback['type'];
-    if (result.hit && !result.blocked) {
-      feedbackType = result.critical ? 'critical' : 'hit';
-    } else if (result.dodged) {
-      feedbackType = 'dodge';
-    } else if (result.blocked) {
-      feedbackType = 'block';
-    } else {
-      feedbackType = 'miss';
-    }
 
-    const feedback: CombatFeedback = {
-      type: feedbackType,
-      damage: result.damage,
-      isCritical: result.critical,
-      position: { x: enemy.x, y: enemy.y },
-      sourceId: 'player',
-      targetId: result.targetId
-    };
-
-    // Create floating damage text for hits
-    if (result.hit && result.damage) {
-      this.createFloatingDamageText(enemy.x, enemy.y - 20, result.damage, result.critical);
+  // Method to update player stats from Redux
+  public setPlayerStats(playerStats: PlayerStats) {
+    if (this.combatManager) {
+      // Update the player stats in the existing combat manager
+      this.combatManager.updatePlayerStats(playerStats);
       
-      // Update enemy health bar
-      const currentHealthBar = this.enemyHealthBars.get(result.targetId);
-      if (currentHealthBar) {
-        const currentHealth = Math.max(0, (currentHealthBar as any).currentHealth - result.damage);
-        this.updateEnemyHealthBar(result.targetId, currentHealth, enemy.x, enemy.y);
-      }
-    }
-
-    // Trigger enhanced feedback through FeedbackManager
-    this.feedbackManager.triggerCombatFeedback(feedback);
-
-    // Trigger enemy reaction
-    if (result.hit || result.blocked) {
-      if (enemy.sprite) {
-        this.triggerEnemyReaction({ sprite: enemy.sprite }, result.blocked ? 'blocked' : 'hit', result.critical);
-      }
-    }
-
-    // Log to console as well
-    if (result.hit) {
-      if (result.critical) {
-        console.log('Critical hit!', result.damage, 'damage');
-      } else {
-        console.log('Hit for', result.damage, 'damage');
-      }
-    } else if (result.dodged) {
-      console.log('Attack dodged!');
-    } else if (result.blocked) {
-      console.log('Attack blocked!');
-    } else {
-      console.log('Attack missed!');
+      // Emit initial HUD update with correct health values
+      const derivedStats = playerStats.getDerivedStats();
+      this.events.emit('hudUpdate', {
+        playerHealth: derivedStats.currentHealth,
+        maxHealth: derivedStats.maxHealth,
+        playerMana: derivedStats.currentMana,
+        maxMana: derivedStats.maxMana
+      });
     }
   }
-
 
   private triggerEnemyReaction(enemy: { sprite: Phaser.GameObjects.Sprite }, reactionType: 'hit' | 'blocked' | 'dodge', isCritical: boolean = false) {
     if (!enemy.sprite) return;
@@ -1288,29 +1362,38 @@ export default class MainScene extends Scene {
         
         // Process projectile hits through feedback system
         hitResults.forEach(hit => {
-          const enemy = this.combatManager.getEnemyInfo(hit.targetId);
-          if (enemy) {
-            // Create floating damage text
-            this.createFloatingDamageText(enemy.x, enemy.y - 20, hit.damage, hit.critical);
+          const enemyTarget = this.combatManager.getEnemy(hit.targetId);
+          if (enemyTarget) {
+            // Apply damage through combat manager (this also handles death)
+            this.combatManager.applyDamageToEnemy(hit.targetId, hit.damage);
             
-            // Update enemy health bar
-            const currentHealthBar = this.enemyHealthBars.get(hit.targetId);
-            if (currentHealthBar) {
-              const currentHealth = Math.max(0, (currentHealthBar as any).currentHealth - hit.damage);
-              this.updateEnemyHealthBar(hit.targetId, currentHealth, enemy.x, enemy.y);
+            // Get updated health for display
+            const updatedEnemy = this.combatManager.getEnemy(hit.targetId);
+            
+            // Create floating damage text
+            this.createFloatingDamageText(enemyTarget.x, enemyTarget.y - 20, hit.damage, hit.critical);
+            
+            // Update enemy health bar if enemy still exists
+            if (updatedEnemy) {
+              this.updateEnemyHealthBar(hit.targetId, updatedEnemy.currentHealth, enemyTarget.x, enemyTarget.y);
+            } else {
+              // Enemy died, remove from scene
+              this.removeEnemyFromScene(hit.targetId);
             }
             
+            // Show feedback effects
             const feedback: CombatFeedback = {
               type: 'projectile_hit',
               damage: hit.damage,
               isCritical: hit.critical,
-              position: { x: enemy.x, y: enemy.y },
+              position: { x: enemyTarget.x, y: enemyTarget.y },
               sourceId: 'player',
               targetId: hit.targetId
             };
             this.feedbackManager.triggerCombatFeedback(feedback);
-            if (enemy.sprite) {
-              this.triggerEnemyReaction({ sprite: enemy.sprite }, 'hit', hit.critical);
+            
+            if (enemyTarget.sprite) {
+              this.triggerEnemyReaction({ sprite: enemyTarget.sprite }, 'hit', hit.critical);
             }
           }
         });

@@ -60,8 +60,13 @@ export default function Game() {
     gameInstanceRef.current = game;
 
     // Set up HUD state communication
-    const mainScene = game.scene.getScene('MainScene');
+    const mainScene = game.scene.getScene('MainScene') as any;
     if (mainScene) {
+      // Pass player stats to the scene
+      if (playerStats) {
+        mainScene.setPlayerStats(playerStats);
+      }
+      
       // Listen for HUD updates from the scene
       mainScene.events.on('hudUpdate', (data: any) => {
         setHudState(prev => ({ ...prev, ...data }));
@@ -102,7 +107,11 @@ export default function Game() {
     <div className="game-container">
       <GameHUD {...hudState} />
       <HotBar />
-      <div className="game-canvas" ref={gameRef} />
+      <div 
+        className="game-canvas" 
+        ref={gameRef} 
+        onContextMenu={(e) => e.preventDefault()}
+      />
       <div className="game-ui">
         <PlayerStats />
         <StatAllocation />

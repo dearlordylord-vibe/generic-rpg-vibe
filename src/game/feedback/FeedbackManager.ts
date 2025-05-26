@@ -9,7 +9,7 @@ export interface FeedbackConfig {
 }
 
 export interface CombatFeedback {
-  type: 'hit' | 'miss' | 'dodge' | 'block' | 'critical' | 'explosion' | 'projectile_hit' | 'special';
+  type: 'hit' | 'miss' | 'dodge' | 'block' | 'critical' | 'explosion' | 'projectile_hit' | 'special' | 'attack';
   damage?: number;
   isCritical?: boolean;
   position: { x: number; y: number };

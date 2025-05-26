@@ -14,5 +14,16 @@ export const config: Phaser.Types.Core.GameConfig = {
       debug: process.env.NODE_ENV === 'development'
     }
   },
-  backgroundColor: '#2d2d2d'
+  backgroundColor: '#2d2d2d',
+  input: {
+    mouse: {
+      preventDefaultDown: true,
+      preventDefaultUp: true,
+      preventDefaultMove: true,
+      preventDefaultWheel: true
+    },
+    touch: {
+      capture: true
+    }
+  }
 }; 

@@ -16,9 +16,9 @@ const HotBar: React.FC = () => {
 
   const handleItemClick = (index: number) => {
     const item = hotbarItems[index];
-    if (item && item.equipment.getType() === 'consumable') {
-      console.log(`Using item: ${item.equipment.getName()}`);
-      // TODO: Implement item usage
+    if (item) {
+      console.log(`Selected item: ${item.equipment.getName()}`);
+      // TODO: Implement item usage/equipping
     }
   };
 
