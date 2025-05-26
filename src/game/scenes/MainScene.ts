@@ -2,6 +2,7 @@ import { Scene } from 'phaser';
 import { GameState } from '../models/GameState';
 import { CombatManager } from '../combat/CombatManager';
 import { ProjectileManager } from '../combat/ProjectileManager';
+import { AOEManager } from '../combat/AOEManager';
 import { PlayerStats } from '../models/PlayerStats';
 import { InventoryManager } from '../models/InventoryManager';
 
@@ -22,7 +23,9 @@ export default class MainScene extends Scene {
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private combatManager!: CombatManager;
   private projectileManager!: ProjectileManager;
+  private aoeManager!: AOEManager;
   private currentProjectileType: string = 'arrow';
+  private currentAOEType: string = 'explosion';
   private assetsLoaded: boolean = false;
   private animationsCreated: boolean = false;
   private readonly ANIMATION_CONFIG: AnimationConfigs = {
@@ -146,6 +149,7 @@ export default class MainScene extends Scene {
     
     this.combatManager = new CombatManager(this, playerStats, inventoryManager);
     this.projectileManager = new ProjectileManager(this);
+    this.aoeManager = new AOEManager(this);
     
     // Add a test enemy
     this.addTestEnemy();
@@ -167,14 +171,17 @@ export default class MainScene extends Scene {
 
   private setupMouseControls() {
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.handleMouseClick(pointer.x, pointer.y, pointer.rightButtonDown());
+      this.handleMouseClick(pointer.x, pointer.y, pointer.rightButtonDown(), pointer.middleButtonDown());
     });
   }
 
-  private handleMouseClick(x: number, y: number, isRightClick: boolean = false) {
-    if (!this.combatManager || !this.projectileManager) return;
+  private handleMouseClick(x: number, y: number, isRightClick: boolean = false, isMiddleClick: boolean = false) {
+    if (!this.combatManager || !this.projectileManager || !this.aoeManager) return;
 
-    if (isRightClick) {
+    if (isMiddleClick) {
+      // Middle click for AOE attacks
+      this.handleAOEAttack(x, y);
+    } else if (isRightClick) {
       // Right click for projectile attacks
       this.handleProjectileAttack(x, y);
     } else {
@@ -216,12 +223,46 @@ export default class MainScene extends Scene {
     }
   }
 
+  private handleAOEAttack(x: number, y: number) {
+    if (!this.cat) return;
+
+    // Get player stats for damage calculation
+    const playerStats = this.combatManager.getPlayerStats();
+    
+    // Create AOE effect at target location
+    const result = this.aoeManager.createAOE(
+      this.currentAOEType,
+      x,
+      y,
+      'player',
+      playerStats
+    );
+
+    if (result) {
+      console.log(`Created ${this.currentAOEType} AOE:`, result);
+      console.log(`Targets hit: ${result.targetsHit.length}`);
+      
+      // Show AOE feedback
+      this.showAOEFeedback(result);
+    } else {
+      console.log('Failed to create AOE effect');
+    }
+  }
+
   private selectProjectileType(type: string) {
     this.currentProjectileType = type;
     console.log(`Selected projectile type: ${type}`);
     
     // Show visual feedback for projectile selection
     this.showProjectileSelectionFeedback(type);
+  }
+
+  private selectAOEType(type: string) {
+    this.currentAOEType = type;
+    console.log(`Selected AOE type: ${type}`);
+    
+    // Show visual feedback for AOE selection
+    this.showAOESelectionFeedback(type);
   }
 
   private showProjectileSelectionFeedback(type: string) {
@@ -241,6 +282,53 @@ export default class MainScene extends Scene {
       ease: 'Power2',
       onComplete: () => {
         text.destroy();
+      }
+    });
+  }
+
+  private showAOESelectionFeedback(type: string) {
+    const text = this.add.text(400, 80, `AOE: ${type.toUpperCase()}`, {
+      fontSize: '20px',
+      color: '#ff8800',
+      fontStyle: 'bold'
+    });
+
+    text.setOrigin(0.5, 0.5);
+
+    // Animate and remove the text
+    this.tweens.add({
+      targets: text,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Power2',
+      onComplete: () => {
+        text.destroy();
+      }
+    });
+  }
+
+  private showAOEFeedback(result: any) {
+    // Create a temporary visual indicator for AOE area
+    const aoeIndicator = this.add.circle(result.centerX, result.centerY, result.radius, 0xffaa00, 0.2);
+    
+    this.tweens.add({
+      targets: aoeIndicator,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        aoeIndicator.destroy();
+      }
+    });
+
+    // Show damage numbers for each target hit
+    result.targetsHit.forEach((hit: any) => {
+      const enemy = this.combatManager.getEnemyInfo(hit.targetId);
+      if (enemy) {
+        this.showDamageText(enemy.x, enemy.y, hit.damage, hit.isCritical);
+        if (hit.isCritical) {
+          this.showHitEffect(enemy.x, enemy.y, true);
+        }
       }
     });
   }
@@ -406,6 +494,19 @@ export default class MainScene extends Scene {
       key2.on('down', () => this.selectProjectileType('magic_bolt'));
       key3.on('down', () => this.selectProjectileType('fireball'));
       key4.on('down', () => this.selectProjectileType('piercing_arrow'));
+
+      // AOE type selection
+      const keyQ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+      const keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+      const keyE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+      const keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+      const keyT = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T);
+
+      keyQ.on('down', () => this.selectAOEType('explosion'));
+      keyW.on('down', () => this.selectAOEType('magic_circle'));
+      keyE.on('down', () => this.selectAOEType('shockwave'));
+      keyR.on('down', () => this.selectAOEType('ice_storm'));
+      keyT.on('down', () => this.selectAOEType('lightning_strike'));
     }
   }
 
@@ -477,6 +578,12 @@ export default class MainScene extends Scene {
         const deltaTime = this.game.loop.delta;
         const targets = this.combatManager ? this.combatManager.getAllTargets() : [];
         this.projectileManager.update(deltaTime, targets);
+      }
+
+      // Update AOE manager
+      if (this.aoeManager) {
+        const deltaTime = this.game.loop.delta;
+        this.aoeManager.update(deltaTime);
       }
     } catch (error) {
       console.error('Error in update:', error);

@@ -332,6 +332,11 @@ export class CombatManager {
     return targets;
   }
 
+  // Get player stats for AOE damage calculation
+  getPlayerStats(): PlayerStats {
+    return this.player.stats;
+  }
+
   // Update combat state (call in scene update)
   update(): void {
     // Process action queue
