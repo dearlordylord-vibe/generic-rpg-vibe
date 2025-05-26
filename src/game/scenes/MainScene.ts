@@ -1,5 +1,8 @@
 import { Scene } from 'phaser';
 import { GameState } from '../models/GameState';
+import { CombatManager } from '../combat/CombatManager';
+import { PlayerStats } from '../models/PlayerStats';
+import { InventoryManager } from '../models/InventoryManager';
 
 interface AnimationConfig {
   start: number;
@@ -16,6 +19,7 @@ export default class MainScene extends Scene {
   private cat!: Phaser.GameObjects.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private combatManager!: CombatManager;
   private assetsLoaded: boolean = false;
   private animationsCreated: boolean = false;
   private readonly ANIMATION_CONFIG: AnimationConfigs = {
@@ -78,6 +82,7 @@ export default class MainScene extends Scene {
     try {
       this.initializeCatSprite();
       this.initializeControls();
+      this.initializeCombat();
     } catch (error) {
       console.error('Error in create:', error);
     }
@@ -128,6 +133,175 @@ export default class MainScene extends Scene {
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     
     this.setupKeyboardHandlers();
+    this.setupMouseControls();
+  }
+
+  private initializeCombat() {
+    // Initialize with basic player stats
+    const playerStats = new PlayerStats();
+    const inventoryManager = new InventoryManager();
+    
+    this.combatManager = new CombatManager(this, playerStats, inventoryManager);
+    
+    // Add a test enemy
+    this.addTestEnemy();
+  }
+
+  private addTestEnemy() {
+    // Create a test enemy sprite
+    const enemySprite = this.add.rectangle(600, 300, 32, 32, 0xff0000);
+    enemySprite.setOrigin(0.5, 0.5);
+    
+    // Create enemy stats
+    const enemyStats = new PlayerStats();
+    enemyStats.addStatPoints(5);
+    enemyStats.allocateStatPoint('strength');
+    enemyStats.allocateStatPoint('vitality');
+    
+    this.combatManager.addEnemy('enemy1', 600, 300, enemyStats, enemySprite as any);
+  }
+
+  private setupMouseControls() {
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.handleMouseClick(pointer.x, pointer.y);
+    });
+  }
+
+  private handleMouseClick(x: number, y: number) {
+    if (!this.combatManager) return;
+
+    // Check if clicking on an enemy in range
+    const result = this.combatManager.performAttack(x, y);
+    
+    if (result) {
+      console.log('Attack result:', result);
+      this.showAttackFeedback(result);
+    } else {
+      // No valid target or can't attack
+      console.log('No valid target or cannot attack');
+    }
+  }
+
+  private showAttackFeedback(result: any) {
+    // Find the target enemy to show feedback on
+    const enemy = this.combatManager.getEnemyInfo(result.targetId);
+    if (!enemy || !enemy.sprite) return;
+
+    // Create damage text
+    if (result.hit && !result.blocked) {
+      this.showDamageText(enemy.x, enemy.y, result.damage, result.critical);
+      this.showHitEffect(enemy.x, enemy.y, result.critical);
+    } else if (result.dodged) {
+      this.showStatusText(enemy.x, enemy.y, 'DODGED', 0xffff00);
+    } else if (result.blocked) {
+      this.showStatusText(enemy.x, enemy.y, 'BLOCKED', 0x888888);
+      this.showBlockEffect(enemy.x, enemy.y);
+    } else {
+      this.showStatusText(enemy.x, enemy.y, 'MISS', 0x666666);
+    }
+
+    // Log to console as well
+    if (result.hit) {
+      if (result.critical) {
+        console.log('Critical hit!', result.damage, 'damage');
+      } else {
+        console.log('Hit for', result.damage, 'damage');
+      }
+    } else if (result.dodged) {
+      console.log('Attack dodged!');
+    } else if (result.blocked) {
+      console.log('Attack blocked!');
+    } else {
+      console.log('Attack missed!');
+    }
+  }
+
+  private showDamageText(x: number, y: number, damage: number, critical: boolean) {
+    const color = critical ? 0xff6600 : 0xff0000;
+    const text = this.add.text(x, y - 20, damage.toString(), {
+      fontSize: critical ? '24px' : '18px',
+      color: '#' + color.toString(16).padStart(6, '0'),
+      fontStyle: critical ? 'bold' : 'normal'
+    });
+
+    text.setOrigin(0.5, 0.5);
+
+    // Animate the text
+    this.tweens.add({
+      targets: text,
+      y: y - 50,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        text.destroy();
+      }
+    });
+  }
+
+  private showStatusText(x: number, y: number, status: string, color: number) {
+    const text = this.add.text(x, y - 20, status, {
+      fontSize: '16px',
+      color: '#' + color.toString(16).padStart(6, '0'),
+      fontStyle: 'bold'
+    });
+
+    text.setOrigin(0.5, 0.5);
+
+    // Animate the text
+    this.tweens.add({
+      targets: text,
+      y: y - 40,
+      alpha: 0,
+      duration: 800,
+      ease: 'Power2',
+      onComplete: () => {
+        text.destroy();
+      }
+    });
+  }
+
+  private showHitEffect(x: number, y: number, critical: boolean) {
+    // Create hit particles
+    const particleColor = critical ? 0xffff00 : 0xff0000;
+    const particleCount = critical ? 15 : 8;
+
+    for (let i = 0; i < particleCount; i++) {
+      const particle = this.add.circle(x, y, 2, particleColor);
+      const angle = (i / particleCount) * Math.PI * 2;
+      const distance = critical ? 40 : 25;
+
+      this.tweens.add({
+        targets: particle,
+        x: x + Math.cos(angle) * distance,
+        y: y + Math.sin(angle) * distance,
+        alpha: 0,
+        scaleX: 0,
+        scaleY: 0,
+        duration: 300,
+        ease: 'Power2',
+        onComplete: () => {
+          particle.destroy();
+        }
+      });
+    }
+  }
+
+  private showBlockEffect(x: number, y: number) {
+    // Create block effect with shield-like appearance
+    const shield = this.add.circle(x, y, 20, 0x888888, 0.7);
+    
+    this.tweens.add({
+      targets: shield,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      alpha: 0,
+      duration: 300,
+      ease: 'Power2',
+      onComplete: () => {
+        shield.destroy();
+      }
+    });
   }
 
   private setupKeyboardHandlers() {
@@ -138,6 +312,27 @@ export default class MainScene extends Scene {
     this.spaceKey.on('up', () => {
       this.playAnimationSafely('idle');
     });
+
+    // Add combat controls
+    if (this.input.keyboard) {
+      // Block with Shift key
+      const shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+      shiftKey.on('down', () => {
+        if (this.combatManager) {
+          this.combatManager.startBlock();
+          console.log('Started blocking');
+        }
+      });
+
+      // Dodge with Ctrl key
+      const ctrlKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL);
+      ctrlKey.on('down', () => {
+        if (this.combatManager) {
+          const success = this.combatManager.performDodge();
+          console.log('Dodge attempt:', success ? 'success' : 'failed');
+        }
+      });
+    }
   }
 
   private playAnimationSafely(key: AnimationKey) {
@@ -196,6 +391,12 @@ export default class MainScene extends Scene {
 
     try {
       this.handleMovement();
+      
+      // Update combat manager
+      if (this.combatManager) {
+        this.combatManager.updatePlayerPosition(this.cat.x, this.cat.y);
+        this.combatManager.update();
+      }
     } catch (error) {
       console.error('Error in update:', error);
       this.playAnimationSafely('idle');
