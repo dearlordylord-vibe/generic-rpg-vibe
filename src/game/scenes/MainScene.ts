@@ -5,6 +5,7 @@ import { ProjectileManager } from '../combat/ProjectileManager';
 import { AOEManager } from '../combat/AOEManager';
 import { PlayerStats } from '../models/PlayerStats';
 import { InventoryManager } from '../models/InventoryManager';
+import { FeedbackManager, CombatFeedback } from '../feedback/FeedbackManager';
 
 interface AnimationConfig {
   start: number;
@@ -24,6 +25,7 @@ export default class MainScene extends Scene {
   private combatManager!: CombatManager;
   private projectileManager!: ProjectileManager;
   private aoeManager!: AOEManager;
+  private feedbackManager!: FeedbackManager;
   private currentProjectileType: string = 'arrow';
   private currentAOEType: string = 'explosion';
   private assetsLoaded: boolean = false;
@@ -150,6 +152,7 @@ export default class MainScene extends Scene {
     this.combatManager = new CombatManager(this, playerStats, inventoryManager);
     this.projectileManager = new ProjectileManager(this);
     this.aoeManager = new AOEManager(this);
+    this.feedbackManager = new FeedbackManager(this);
     
     // Add a test enemy
     this.addTestEnemy();
@@ -166,7 +169,7 @@ export default class MainScene extends Scene {
     enemyStats.allocateStatPoint('strength');
     enemyStats.allocateStatPoint('vitality');
     
-    this.combatManager.addEnemy('enemy1', 600, 300, enemyStats, enemySprite as any);
+    this.combatManager.addEnemy('enemy1', 600, 300, enemyStats, enemySprite as Phaser.GameObjects.Sprite);
   }
 
   private setupMouseControls() {
@@ -307,48 +310,65 @@ export default class MainScene extends Scene {
     });
   }
 
-  private showAOEFeedback(result: any) {
-    // Create a temporary visual indicator for AOE area
-    const aoeIndicator = this.add.circle(result.centerX, result.centerY, result.radius, 0xffaa00, 0.2);
-    
-    this.tweens.add({
-      targets: aoeIndicator,
-      alpha: 0,
-      duration: 1000,
-      ease: 'Power2',
-      onComplete: () => {
-        aoeIndicator.destroy();
-      }
-    });
+  private showAOEFeedback(result: { centerX: number; centerY: number; targetsHit: Array<{ targetId: string; damage: number; isCritical: boolean }> }) {
+    // Trigger AOE explosion feedback
+    const explosionFeedback: CombatFeedback = {
+      type: 'explosion',
+      position: { x: result.centerX, y: result.centerY },
+      sourceId: 'player'
+    };
+    this.feedbackManager.triggerCombatFeedback(explosionFeedback);
 
-    // Show damage numbers for each target hit
-    result.targetsHit.forEach((hit: any) => {
+    // Show individual damage feedback for each target hit
+    result.targetsHit.forEach((hit) => {
       const enemy = this.combatManager.getEnemyInfo(hit.targetId);
       if (enemy) {
-        this.showDamageText(enemy.x, enemy.y, hit.damage, hit.isCritical);
-        if (hit.isCritical) {
-          this.showHitEffect(enemy.x, enemy.y, true);
-        }
+        const hitFeedback: CombatFeedback = {
+          type: hit.isCritical ? 'critical' : 'hit',
+          damage: hit.damage,
+          isCritical: hit.isCritical,
+          position: { x: enemy.x, y: enemy.y },
+          sourceId: 'player',
+          targetId: hit.targetId
+        };
+        this.feedbackManager.triggerCombatFeedback(hitFeedback);
+        this.triggerEnemyReaction(enemy, 'hit', hit.isCritical);
       }
     });
   }
 
-  private showAttackFeedback(result: any) {
+  private showAttackFeedback(result: { hit: boolean; blocked: boolean; dodged: boolean; critical: boolean; damage?: number; targetId: string }) {
     // Find the target enemy to show feedback on
     const enemy = this.combatManager.getEnemyInfo(result.targetId);
     if (!enemy || !enemy.sprite) return;
 
-    // Create damage text
+    // Create feedback object for the FeedbackManager
+    let feedbackType: CombatFeedback['type'];
     if (result.hit && !result.blocked) {
-      this.showDamageText(enemy.x, enemy.y, result.damage, result.critical);
-      this.showHitEffect(enemy.x, enemy.y, result.critical);
+      feedbackType = result.critical ? 'critical' : 'hit';
     } else if (result.dodged) {
-      this.showStatusText(enemy.x, enemy.y, 'DODGED', 0xffff00);
+      feedbackType = 'dodge';
     } else if (result.blocked) {
-      this.showStatusText(enemy.x, enemy.y, 'BLOCKED', 0x888888);
-      this.showBlockEffect(enemy.x, enemy.y);
+      feedbackType = 'block';
     } else {
-      this.showStatusText(enemy.x, enemy.y, 'MISS', 0x666666);
+      feedbackType = 'miss';
+    }
+
+    const feedback: CombatFeedback = {
+      type: feedbackType,
+      damage: result.damage,
+      isCritical: result.critical,
+      position: { x: enemy.x, y: enemy.y },
+      sourceId: 'player',
+      targetId: result.targetId
+    };
+
+    // Trigger enhanced feedback through FeedbackManager
+    this.feedbackManager.triggerCombatFeedback(feedback);
+
+    // Trigger enemy reaction
+    if (result.hit || result.blocked) {
+      this.triggerEnemyReaction(enemy, result.blocked ? 'blocked' : 'hit', result.critical);
     }
 
     // Log to console as well
@@ -367,92 +387,77 @@ export default class MainScene extends Scene {
     }
   }
 
-  private showDamageText(x: number, y: number, damage: number, critical: boolean) {
-    const color = critical ? 0xff6600 : 0xff0000;
-    const text = this.add.text(x, y - 20, damage.toString(), {
-      fontSize: critical ? '24px' : '18px',
-      color: '#' + color.toString(16).padStart(6, '0'),
-      fontStyle: critical ? 'bold' : 'normal'
-    });
 
-    text.setOrigin(0.5, 0.5);
+  private triggerEnemyReaction(enemy: { sprite: Phaser.GameObjects.Sprite }, reactionType: 'hit' | 'blocked' | 'dodge', isCritical: boolean = false) {
+    if (!enemy.sprite) return;
 
-    // Animate the text
-    this.tweens.add({
-      targets: text,
-      y: y - 50,
-      alpha: 0,
-      duration: 1000,
-      ease: 'Power2',
-      onComplete: () => {
-        text.destroy();
-      }
-    });
-  }
-
-  private showStatusText(x: number, y: number, status: string, color: number) {
-    const text = this.add.text(x, y - 20, status, {
-      fontSize: '16px',
-      color: '#' + color.toString(16).padStart(6, '0'),
-      fontStyle: 'bold'
-    });
-
-    text.setOrigin(0.5, 0.5);
-
-    // Animate the text
-    this.tweens.add({
-      targets: text,
-      y: y - 40,
-      alpha: 0,
-      duration: 800,
-      ease: 'Power2',
-      onComplete: () => {
-        text.destroy();
-      }
-    });
-  }
-
-  private showHitEffect(x: number, y: number, critical: boolean) {
-    // Create hit particles
-    const particleColor = critical ? 0xffff00 : 0xff0000;
-    const particleCount = critical ? 15 : 8;
-
-    for (let i = 0; i < particleCount; i++) {
-      const particle = this.add.circle(x, y, 2, particleColor);
-      const angle = (i / particleCount) * Math.PI * 2;
-      const distance = critical ? 40 : 25;
-
-      this.tweens.add({
-        targets: particle,
-        x: x + Math.cos(angle) * distance,
-        y: y + Math.sin(angle) * distance,
-        alpha: 0,
-        scaleX: 0,
-        scaleY: 0,
-        duration: 300,
-        ease: 'Power2',
-        onComplete: () => {
-          particle.destroy();
-        }
-      });
-    }
-  }
-
-  private showBlockEffect(x: number, y: number) {
-    // Create block effect with shield-like appearance
-    const shield = this.add.circle(x, y, 20, 0x888888, 0.7);
+    const originalColor = enemy.sprite.tint || 0xffffff;
     
-    this.tweens.add({
-      targets: shield,
-      scaleX: 1.5,
-      scaleY: 1.5,
-      alpha: 0,
-      duration: 300,
-      ease: 'Power2',
-      onComplete: () => {
-        shield.destroy();
+    switch (reactionType) {
+      case 'hit': {
+        // Flash red for damage
+        const flashColor = isCritical ? 0xff0000 : 0xff8888;
+        enemy.sprite.setTint(flashColor);
+        
+        // Knockback effect
+        const knockbackDistance = isCritical ? 15 : 8;
+        const knockbackDuration = isCritical ? 200 : 150;
+        
+        this.tweens.add({
+          targets: enemy.sprite,
+          x: enemy.sprite.x + (Math.random() - 0.5) * knockbackDistance,
+          y: enemy.sprite.y + (Math.random() - 0.5) * knockbackDistance,
+          duration: knockbackDuration / 2,
+          yoyo: true,
+          ease: 'Power2'
+        });
+
+        // Reset color after flash
+        this.time.delayedCall(100, () => {
+          if (enemy.sprite) {
+            enemy.sprite.setTint(originalColor);
+          }
+        });
+        break;
       }
-    });
+
+      case 'blocked': {
+        // Flash blue for block
+        enemy.sprite.setTint(0x4444ff);
+        
+        // Slight recoil
+        this.tweens.add({
+          targets: enemy.sprite,
+          scaleX: 0.9,
+          scaleY: 0.9,
+          duration: 100,
+          yoyo: true,
+          ease: 'Power2'
+        });
+
+        this.time.delayedCall(150, () => {
+          if (enemy.sprite) {
+            enemy.sprite.setTint(originalColor);
+          }
+        });
+        break;
+      }
+
+      case 'dodge': {
+        // Quick sidestep animation
+        const dodgeDistance = 20;
+        const originalX = enemy.sprite.x;
+        
+        this.tweens.add({
+          targets: enemy.sprite,
+          x: originalX + dodgeDistance,
+          duration: 100,
+          ease: 'Power2',
+          yoyo: true
+        });
+        break;
+      }
+    }
   }
 
   private setupKeyboardHandlers() {
@@ -577,7 +582,24 @@ export default class MainScene extends Scene {
       if (this.projectileManager) {
         const deltaTime = this.game.loop.delta;
         const targets = this.combatManager ? this.combatManager.getAllTargets() : [];
-        this.projectileManager.update(deltaTime, targets);
+        const hitResults = this.projectileManager.update(deltaTime, targets);
+        
+        // Process projectile hits through feedback system
+        hitResults.forEach(hit => {
+          const enemy = this.combatManager.getEnemyInfo(hit.targetId);
+          if (enemy) {
+            const feedback: CombatFeedback = {
+              type: 'projectile_hit',
+              damage: hit.damage,
+              isCritical: hit.critical,
+              position: { x: enemy.x, y: enemy.y },
+              sourceId: 'player',
+              targetId: hit.targetId
+            };
+            this.feedbackManager.triggerCombatFeedback(feedback);
+            this.triggerEnemyReaction(enemy, 'hit', hit.critical);
+          }
+        });
       }
 
       // Update AOE manager
