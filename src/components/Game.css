@@ -4,6 +4,7 @@
   background-color: #1a1a1a;
   padding: 20px;
   gap: 20px;
+  position: relative;
 }
 
 .game-canvas {
@@ -32,18 +33,18 @@
   gap: 10px;
 }
 
-.save-button, .xp-button {
+.save-button, .xp-button, .test-items-button, .inventory-button {
   background-color: #4a90e2;
   color: white;
   border: none;
   border-radius: 5px;
-  padding: 10px 20px;
-  font-size: 16px;
+  padding: 8px 16px;
+  font-size: 14px;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.save-button:hover, .xp-button:hover {
+.save-button:hover, .xp-button:hover, .test-items-button:hover, .inventory-button:hover {
   background-color: #357abd;
 }
 
@@ -53,6 +54,22 @@
 
 .xp-button:hover {
   background-color: #218838;
+}
+
+.test-items-button {
+  background-color: #17a2b8;
+}
+
+.test-items-button:hover {
+  background-color: #138496;
+}
+
+.inventory-button {
+  background-color: #6f42c1;
+}
+
+.inventory-button:hover {
+  background-color: #5a32a3;
 }
 
 .level-up-notification {

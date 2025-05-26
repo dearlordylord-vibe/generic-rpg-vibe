@@ -32,6 +32,9 @@ export default class MainScene extends Scene {
   private currentAOEType: string = 'explosion';
   private assetsLoaded: boolean = false;
   private animationsCreated: boolean = false;
+  private enemyHealthBars: Map<string, Phaser.GameObjects.Container> = new Map();
+  private isBlocking: boolean = false;
+  private isDodging: boolean = false;
   private readonly ANIMATION_CONFIG: AnimationConfigs = {
     idle: { start: 0, end: 3, frameRate: 8, duration: 500 },
     walk: { start: 4, end: 7, frameRate: 12, duration: 400 }
@@ -163,29 +166,410 @@ export default class MainScene extends Scene {
     
     // Add a test enemy
     this.addTestEnemy();
+    
+    // Add village portal
+    this.addVillagePortal();
   }
 
   private addTestEnemy() {
-    // Create a test enemy sprite using a simple colored sprite
-    // First create a fallback texture for the enemy
-    if (!this.textures.exists('enemy_fallback')) {
-      this.add.graphics()
-        .fillStyle(0xff0000)
-        .fillRect(0, 0, 32, 32)
-        .generateTexture('enemy_fallback', 32, 32)
-        .destroy();
-    }
+    // Create multiple enemy types
+    this.createEnemyTextures();
+    this.spawnInitialEnemies();
     
-    const enemySprite = this.add.sprite(600, 300, 'enemy_fallback');
+    // Spawn additional enemies periodically
+    this.time.addEvent({
+      delay: 10000, // Spawn new enemy every 10 seconds
+      callback: this.spawnRandomEnemy,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  private createEnemyTextures() {
+    // Create different colored textures for different enemy types
+    const enemyTypes = [
+      { key: 'wraith', color: 0x9400d3, size: 28 }, // Purple - Wraith
+      { key: 'iron_golem', color: 0x808080, size: 40 }, // Gray - Iron Golem
+      { key: 'carrion_bat', color: 0x654321, size: 20 }, // Brown - Carrion Bat
+      { key: 'basic_enemy', color: 0xff0000, size: 32 } // Red - Basic enemy
+    ];
+
+    enemyTypes.forEach(type => {
+      if (!this.textures.exists(type.key)) {
+        this.add.graphics()
+          .fillStyle(type.color)
+          .fillRect(0, 0, type.size, type.size)
+          .generateTexture(type.key, type.size, type.size)
+          .destroy();
+      }
+    });
+  }
+
+  private spawnInitialEnemies() {
+    // Spawn one of each enemy type initially
+    this.spawnEnemy('wraith', 550, 250);
+    this.spawnEnemy('iron_golem', 650, 350);
+    this.spawnEnemy('carrion_bat', 600, 200);
+  }
+
+  private spawnRandomEnemy() {
+    const enemyTypes = ['wraith', 'iron_golem', 'carrion_bat', 'basic_enemy'];
+    const randomType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+    
+    // Random position around the edges
+    const spawnPositions = [
+      { x: 50, y: Math.random() * 600 + 50 },   // Left edge
+      { x: 750, y: Math.random() * 600 + 50 },  // Right edge
+      { x: Math.random() * 700 + 50, y: 50 },  // Top edge
+      { x: Math.random() * 700 + 50, y: 550 }  // Bottom edge
+    ];
+    const randomPos = spawnPositions[Math.floor(Math.random() * spawnPositions.length)];
+    
+    this.spawnEnemy(randomType, randomPos.x, randomPos.y);
+  }
+
+  private spawnEnemy(type: string, x: number, y: number) {
+    const enemyId = `${type}_${Date.now()}_${Math.random()}`;
+    const enemySprite = this.add.sprite(x, y, type);
     enemySprite.setOrigin(0.5, 0.5);
     
-    // Create enemy stats
-    const enemyStats = new PlayerStats();
-    enemyStats.addStatPoints(5);
-    enemyStats.allocateStatPoint('strength');
-    enemyStats.allocateStatPoint('vitality');
+    // Create enemy stats based on type
+    const enemyStats = this.createEnemyStats(type);
     
-    this.combatManager.addEnemy('enemy1', 600, 300, enemyStats, enemySprite);
+    this.combatManager.addEnemy(enemyId, x, y, enemyStats, enemySprite);
+    this.createEnemyHealthBar(enemyId, x, y, enemyStats.getDerivedStats().maxHealth);
+    
+    // Add some basic AI movement
+    this.addEnemyAI(enemyId, enemySprite, type);
+  }
+
+  private createEnemyStats(type: string): PlayerStats {
+    const stats = new PlayerStats();
+    
+    switch (type) {
+      case 'wraith':
+        stats.addStatPoints(8);
+        stats.allocateStatPoint('dexterity');
+        stats.allocateStatPoint('dexterity');
+        stats.allocateStatPoint('intelligence');
+        stats.allocateStatPoint('intelligence');
+        break;
+      case 'iron_golem':
+        stats.addStatPoints(12);
+        stats.allocateStatPoint('strength');
+        stats.allocateStatPoint('strength');
+        stats.allocateStatPoint('vitality');
+        stats.allocateStatPoint('vitality');
+        stats.allocateStatPoint('vitality');
+        break;
+      case 'carrion_bat':
+        stats.addStatPoints(5);
+        stats.allocateStatPoint('dexterity');
+        stats.allocateStatPoint('dexterity');
+        break;
+      default: // basic_enemy
+        stats.addStatPoints(5);
+        stats.allocateStatPoint('strength');
+        stats.allocateStatPoint('vitality');
+        break;
+    }
+    
+    return stats;
+  }
+
+  private addEnemyAI(enemyId: string, sprite: Phaser.GameObjects.Sprite, type: string) {
+    // Simple AI: move toward player periodically
+    this.time.addEvent({
+      delay: 2000 + Math.random() * 3000, // Random delay between 2-5 seconds
+      callback: () => {
+        if (!this.cat || !sprite.active) return;
+        
+        const speed = this.getEnemySpeed(type);
+        const angle = Phaser.Math.Angle.Between(sprite.x, sprite.y, this.cat.x, this.cat.y);
+        
+        // Move toward player
+        this.tweens.add({
+          targets: sprite,
+          x: sprite.x + Math.cos(angle) * speed,
+          y: sprite.y + Math.sin(angle) * speed,
+          duration: 1000,
+          ease: 'Power1'
+        });
+
+        // Update health bar position
+        this.updateEnemyHealthBar(enemyId, undefined, sprite.x, sprite.y);
+      },
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  private getEnemySpeed(type: string): number {
+    switch (type) {
+      case 'wraith': return 80;      // Fast and agile
+      case 'iron_golem': return 30;  // Slow and heavy
+      case 'carrion_bat': return 100; // Very fast
+      default: return 50;            // Medium speed
+    }
+  }
+
+  private addVillagePortal() {
+    // Create a portal texture
+    if (!this.textures.exists('village_portal')) {
+      this.add.graphics()
+        .fillStyle(0x00ffff)
+        .fillCircle(25, 25, 25)
+        .fillStyle(0x0088ff)
+        .fillCircle(25, 25, 15)
+        .generateTexture('village_portal', 50, 50)
+        .destroy();
+    }
+
+    const portal = this.add.sprite(100, 500, 'village_portal');
+    portal.setOrigin(0.5, 0.5);
+    portal.setInteractive();
+    
+    // Add portal animation
+    this.tweens.add({
+      targets: portal,
+      scaleX: 1.1,
+      scaleY: 1.1,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    // Add glow effect
+    this.tweens.add({
+      targets: portal,
+      alpha: 0.7,
+      duration: 1000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Power2'
+    });
+
+    // Add click handler for village access
+    portal.on('pointerdown', () => {
+      this.showVillageMenu();
+    });
+
+    // Add hover effects
+    portal.on('pointerover', () => {
+      portal.setTint(0xaaffff);
+      this.showTooltip('Village Portal - Click to visit shops', portal.x, portal.y - 40);
+    });
+
+    portal.on('pointerout', () => {
+      portal.clearTint();
+      this.hideTooltip();
+    });
+  }
+
+  private showVillageMenu() {
+    // Create a simple village menu overlay
+    const menuBg = this.add.rectangle(400, 300, 400, 300, 0x000000, 0.9);
+    menuBg.setDepth(10000);
+    
+    const menuTitle = this.add.text(400, 200, 'Village', {
+      fontSize: '32px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    });
+    menuTitle.setOrigin(0.5, 0.5);
+    menuTitle.setDepth(10001);
+
+    // Shop buttons
+    const blacksmithBtn = this.add.rectangle(300, 280, 150, 40, 0x4a90e2);
+    blacksmithBtn.setInteractive();
+    blacksmithBtn.setDepth(10001);
+    
+    const blacksmithText = this.add.text(300, 280, 'Blacksmith', {
+      fontSize: '16px',
+      color: '#ffffff'
+    });
+    blacksmithText.setOrigin(0.5, 0.5);
+    blacksmithText.setDepth(10002);
+
+    const apothecaryBtn = this.add.rectangle(500, 280, 150, 40, 0x28a745);
+    apothecaryBtn.setInteractive();
+    apothecaryBtn.setDepth(10001);
+    
+    const apothecaryText = this.add.text(500, 280, 'Apothecary', {
+      fontSize: '16px',
+      color: '#ffffff'
+    });
+    apothecaryText.setOrigin(0.5, 0.5);
+    apothecaryText.setDepth(10002);
+
+    const closeBtn = this.add.rectangle(400, 360, 100, 30, 0xff4444);
+    closeBtn.setInteractive();
+    closeBtn.setDepth(10001);
+    
+    const closeText = this.add.text(400, 360, 'Close', {
+      fontSize: '14px',
+      color: '#ffffff'
+    });
+    closeText.setOrigin(0.5, 0.5);
+    closeText.setDepth(10002);
+
+    // Store references for cleanup
+    const menuElements = [menuBg, menuTitle, blacksmithBtn, blacksmithText, apothecaryBtn, apothecaryText, closeBtn, closeText];
+
+    const closeMenu = () => {
+      menuElements.forEach(element => element.destroy());
+    };
+
+    // Button handlers
+    blacksmithBtn.on('pointerdown', () => {
+      closeMenu();
+      this.showShopMessage('Blacksmith', 'Welcome to the Blacksmith! (Shop system from Task 6 ready for integration)');
+    });
+
+    apothecaryBtn.on('pointerdown', () => {
+      closeMenu();
+      this.showShopMessage('Apothecary', 'Welcome to the Apothecary! (Shop system from Task 6 ready for integration)');
+    });
+
+    closeBtn.on('pointerdown', closeMenu);
+
+    // Add hover effects
+    [blacksmithBtn, apothecaryBtn, closeBtn].forEach(btn => {
+      btn.on('pointerover', () => btn.setAlpha(0.8));
+      btn.on('pointerout', () => btn.setAlpha(1));
+    });
+  }
+
+  private showShopMessage(shopName: string, message: string) {
+    const messageText = this.add.text(400, 150, `${shopName}\n\n${message}`, {
+      fontSize: '18px',
+      color: '#ffffff',
+      align: 'center',
+      backgroundColor: '#000000',
+      padding: { x: 20, y: 20 }
+    });
+    messageText.setOrigin(0.5, 0.5);
+    messageText.setDepth(10000);
+
+    // Auto-remove after 3 seconds
+    this.time.delayedCall(3000, () => {
+      messageText.destroy();
+    });
+  }
+
+  private showTooltip(text: string, x: number, y: number) {
+    this.hideTooltip(); // Clean up any existing tooltip
+    
+    (this as any).currentTooltip = this.add.text(x, y, text, {
+      fontSize: '14px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 8, y: 4 }
+    });
+    (this as any).currentTooltip.setOrigin(0.5, 1);
+    (this as any).currentTooltip.setDepth(5000);
+  }
+
+  private hideTooltip() {
+    if ((this as any).currentTooltip) {
+      (this as any).currentTooltip.destroy();
+      (this as any).currentTooltip = null;
+    }
+  }
+
+  private createEnemyHealthBar(enemyId: string, x: number, y: number, maxHealth: number) {
+    const container = this.add.container(x, y - 40);
+    
+    // Background
+    const bgWidth = 60;
+    const bgHeight = 8;
+    const background = this.add.rectangle(0, 0, bgWidth, bgHeight, 0x000000, 0.7);
+    
+    // Health fill
+    const healthFill = this.add.rectangle(-bgWidth/2, 0, bgWidth, bgHeight - 2, 0xff0000);
+    healthFill.setOrigin(0, 0.5);
+    
+    // Border
+    const border = this.add.rectangle(0, 0, bgWidth, bgHeight, 0xffffff, 0);
+    border.setStrokeStyle(1, 0xffffff, 0.8);
+    
+    container.add([background, healthFill, border]);
+    container.setDepth(1000);
+    
+    // Store reference with health data
+    (container as any).healthFill = healthFill;
+    (container as any).maxHealth = maxHealth;
+    (container as any).currentHealth = maxHealth;
+    (container as any).bgWidth = bgWidth;
+    
+    this.enemyHealthBars.set(enemyId, container);
+  }
+
+  private updateEnemyHealthBar(enemyId: string, currentHealth: number, x?: number, y?: number) {
+    const healthBar = this.enemyHealthBars.get(enemyId);
+    if (!healthBar) return;
+    
+    // Update position if provided
+    if (x !== undefined && y !== undefined) {
+      healthBar.setPosition(x, y - 40);
+    }
+    
+    // Update health fill
+    const maxHealth = (healthBar as any).maxHealth;
+    const bgWidth = (healthBar as any).bgWidth;
+    const healthFill = (healthBar as any).healthFill;
+    
+    const healthPercent = Math.max(0, currentHealth / maxHealth);
+    const newWidth = bgWidth * healthPercent;
+    
+    healthFill.setSize(newWidth, healthFill.height);
+    
+    // Change color based on health percentage
+    if (healthPercent > 0.6) {
+      healthFill.setFillStyle(0x00ff00); // Green
+    } else if (healthPercent > 0.3) {
+      healthFill.setFillStyle(0xffff00); // Yellow
+    } else {
+      healthFill.setFillStyle(0xff0000); // Red
+    }
+    
+    // Hide if dead
+    if (currentHealth <= 0) {
+      healthBar.setVisible(false);
+    }
+    
+    (healthBar as any).currentHealth = currentHealth;
+  }
+
+  private createFloatingDamageText(x: number, y: number, damage: number, isCritical: boolean = false) {
+    const color = isCritical ? '#ffff00' : '#ffffff';
+    const fontSize = isCritical ? '24px' : '18px';
+    const prefix = isCritical ? 'CRIT!' : '';
+    
+    const text = this.add.text(x, y, `${prefix} ${damage}`, {
+      fontSize: fontSize,
+      color: color,
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 2
+    });
+    
+    text.setOrigin(0.5, 0.5);
+    text.setDepth(2000);
+    
+    // Animate the text
+    this.tweens.add({
+      targets: text,
+      y: y - 50,
+      alpha: 0,
+      scale: isCritical ? 1.5 : 1.2,
+      duration: isCritical ? 1500 : 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        text.destroy();
+      }
+    });
   }
 
   private setupInputCallbacks() {
@@ -240,47 +624,56 @@ export default class MainScene extends Scene {
     this.inputHandler.registerCallback('select_projectile1', () => {
       this.currentProjectileType = 'arrow';
       console.log('Selected arrow projectile');
+      this.events.emit('hudUpdate', { currentProjectile: this.currentProjectileType });
     });
 
     this.inputHandler.registerCallback('select_projectile2', () => {
       this.currentProjectileType = 'fireball';
       console.log('Selected fireball projectile');
+      this.events.emit('hudUpdate', { currentProjectile: this.currentProjectileType });
     });
 
     this.inputHandler.registerCallback('select_projectile3', () => {
       this.currentProjectileType = 'ice';
       console.log('Selected ice projectile');
+      this.events.emit('hudUpdate', { currentProjectile: this.currentProjectileType });
     });
 
     this.inputHandler.registerCallback('select_projectile4', () => {
       this.currentProjectileType = 'lightning';
       console.log('Selected lightning projectile');
+      this.events.emit('hudUpdate', { currentProjectile: this.currentProjectileType });
     });
 
     // AOE selection callbacks
     this.inputHandler.registerCallback('select_aoe1', () => {
       this.currentAOEType = 'explosion';
       console.log('Selected explosion AOE');
+      this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     this.inputHandler.registerCallback('select_aoe2', () => {
       this.currentAOEType = 'freeze';
       console.log('Selected freeze AOE');
+      this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     this.inputHandler.registerCallback('select_aoe3', () => {
       this.currentAOEType = 'poison';
       console.log('Selected poison AOE');
+      this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     this.inputHandler.registerCallback('select_aoe4', () => {
       this.currentAOEType = 'heal';
       console.log('Selected heal AOE');
+      this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     this.inputHandler.registerCallback('select_aoe5', () => {
       this.currentAOEType = 'shield';
       console.log('Selected shield AOE');
+      this.events.emit('hudUpdate', { currentAOE: this.currentAOEType });
     });
 
     // Combo callbacks
@@ -355,7 +748,15 @@ export default class MainScene extends Scene {
     const result = this.combatManager.startBlock();
     if (result) {
       console.log('Block action started');
+      this.isBlocking = true;
+      this.events.emit('hudUpdate', { isBlocking: true });
       this.triggerBlockFeedback();
+      
+      // Auto-stop blocking after 1 second
+      this.time.delayedCall(1000, () => {
+        this.isBlocking = false;
+        this.events.emit('hudUpdate', { isBlocking: false });
+      });
     }
   }
 
@@ -365,7 +766,15 @@ export default class MainScene extends Scene {
     const result = this.combatManager.performDodge();
     if (result) {
       console.log('Dodge action started');
+      this.isDodging = true;
+      this.events.emit('hudUpdate', { isDodging: true });
       this.triggerDodgeFeedback();
+      
+      // Auto-stop dodging after 500ms
+      this.time.delayedCall(500, () => {
+        this.isDodging = false;
+        this.events.emit('hudUpdate', { isDodging: false });
+      });
     }
   }
 
@@ -585,6 +994,16 @@ export default class MainScene extends Scene {
     result.targetsHit.forEach((hit) => {
       const enemy = this.combatManager.getEnemyInfo(hit.targetId);
       if (enemy) {
+        // Create floating damage text
+        this.createFloatingDamageText(enemy.x, enemy.y - 20, hit.damage, hit.isCritical);
+        
+        // Update enemy health bar (simulated damage for now)
+        const currentHealthBar = this.enemyHealthBars.get(hit.targetId);
+        if (currentHealthBar) {
+          const currentHealth = Math.max(0, (currentHealthBar as any).currentHealth - hit.damage);
+          this.updateEnemyHealthBar(hit.targetId, currentHealth, enemy.x, enemy.y);
+        }
+        
         const hitFeedback: CombatFeedback = {
           type: hit.isCritical ? 'critical' : 'hit',
           damage: hit.damage,
@@ -626,6 +1045,18 @@ export default class MainScene extends Scene {
       sourceId: 'player',
       targetId: result.targetId
     };
+
+    // Create floating damage text for hits
+    if (result.hit && result.damage) {
+      this.createFloatingDamageText(enemy.x, enemy.y - 20, result.damage, result.critical);
+      
+      // Update enemy health bar
+      const currentHealthBar = this.enemyHealthBars.get(result.targetId);
+      if (currentHealthBar) {
+        const currentHealth = Math.max(0, (currentHealthBar as any).currentHealth - result.damage);
+        this.updateEnemyHealthBar(result.targetId, currentHealth, enemy.x, enemy.y);
+      }
+    }
 
     // Trigger enhanced feedback through FeedbackManager
     this.feedbackManager.triggerCombatFeedback(feedback);
@@ -859,6 +1290,16 @@ export default class MainScene extends Scene {
         hitResults.forEach(hit => {
           const enemy = this.combatManager.getEnemyInfo(hit.targetId);
           if (enemy) {
+            // Create floating damage text
+            this.createFloatingDamageText(enemy.x, enemy.y - 20, hit.damage, hit.critical);
+            
+            // Update enemy health bar
+            const currentHealthBar = this.enemyHealthBars.get(hit.targetId);
+            if (currentHealthBar) {
+              const currentHealth = Math.max(0, (currentHealthBar as any).currentHealth - hit.damage);
+              this.updateEnemyHealthBar(hit.targetId, currentHealth, enemy.x, enemy.y);
+            }
+            
             const feedback: CombatFeedback = {
               type: 'projectile_hit',
               damage: hit.damage,

@@ -1,24 +1,52 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { saveState, loadState, addTestItems } from '../store/slices/gameSlice';
-import { initializePlayer, addXP, clearLevelUpMessage, selectLevelUpMessage } from '../store/slices/playerSlice';
+import { initializePlayer, addXP, clearLevelUpMessage, selectLevelUpMessage, selectPlayerStats } from '../store/slices/playerSlice';
 import { config as gameConfig } from '../game/config';
 import PlayerStats from './PlayerStats';
 import StatAllocation from './StatAllocation';
 import Inventory from './Inventory';
+import GameHUD from './GameHUD';
+import HotBar from './HotBar';
 import './Game.css';
 
 export default function Game() {
   const gameRef = useRef<HTMLDivElement>(null);
+  const gameInstanceRef = useRef<Phaser.Game | null>(null);
   const dispatch = useAppDispatch();
   const levelUpMessage = useAppSelector(selectLevelUpMessage);
+  const playerStats = useAppSelector(selectPlayerStats);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [hudState, setHudState] = useState({
+    currentProjectile: 'arrow',
+    currentAOE: 'explosion',
+    playerHealth: 100,
+    maxHealth: 100,
+    playerMana: 50,
+    maxMana: 50,
+    isBlocking: false,
+    isDodging: false
+  });
 
   useEffect(() => {
     // Initialize game state and player on first load
     dispatch(loadState());
     dispatch(initializePlayer());
   }, [dispatch]);
+
+  // Update HUD with player stats
+  useEffect(() => {
+    if (playerStats) {
+      const derivedStats = playerStats.getDerivedStats();
+      setHudState(prev => ({
+        ...prev,
+        playerHealth: derivedStats.currentHealth,
+        maxHealth: derivedStats.maxHealth,
+        playerMana: derivedStats.currentMana,
+        maxMana: derivedStats.maxMana
+      }));
+    }
+  }, [playerStats]);
 
   useEffect(() => {
     if (!gameRef.current) return;
@@ -28,6 +56,17 @@ export default function Game() {
       ...gameConfig,
       parent: gameRef.current
     });
+    
+    gameInstanceRef.current = game;
+
+    // Set up HUD state communication
+    const mainScene = game.scene.getScene('MainScene');
+    if (mainScene) {
+      // Listen for HUD updates from the scene
+      mainScene.events.on('hudUpdate', (data: any) => {
+        setHudState(prev => ({ ...prev, ...data }));
+      });
+    }
 
     // Auto-save game state every 5 minutes
     const saveInterval = setInterval(() => {
@@ -35,7 +74,10 @@ export default function Game() {
     }, 5 * 60 * 1000);
 
     return () => {
-      game.destroy(true);
+      if (gameInstanceRef.current) {
+        gameInstanceRef.current.destroy(true);
+        gameInstanceRef.current = null;
+      }
       clearInterval(saveInterval);
     };
   }, [dispatch]);
@@ -58,6 +100,8 @@ export default function Game() {
 
   return (
     <div className="game-container">
+      <GameHUD {...hudState} />
+      <HotBar />
       <div className="game-canvas" ref={gameRef} />
       <div className="game-ui">
         <PlayerStats />
