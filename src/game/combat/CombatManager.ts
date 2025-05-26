@@ -324,6 +324,14 @@ export class CombatManager {
     return Array.from(this.enemies.values()).map(enemy => ({ ...enemy }));
   }
 
+  // Get all targets (player + enemies) for projectile collision detection
+  getAllTargets(): CombatTarget[] {
+    const targets: CombatTarget[] = [];
+    targets.push({ ...this.player });
+    targets.push(...this.getAllEnemies());
+    return targets;
+  }
+
   // Update combat state (call in scene update)
   update(): void {
     // Process action queue

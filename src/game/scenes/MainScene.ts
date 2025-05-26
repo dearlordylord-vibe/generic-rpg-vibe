@@ -1,6 +1,7 @@
 import { Scene } from 'phaser';
 import { GameState } from '../models/GameState';
 import { CombatManager } from '../combat/CombatManager';
+import { ProjectileManager } from '../combat/ProjectileManager';
 import { PlayerStats } from '../models/PlayerStats';
 import { InventoryManager } from '../models/InventoryManager';
 
@@ -20,6 +21,8 @@ export default class MainScene extends Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private combatManager!: CombatManager;
+  private projectileManager!: ProjectileManager;
+  private currentProjectileType: string = 'arrow';
   private assetsLoaded: boolean = false;
   private animationsCreated: boolean = false;
   private readonly ANIMATION_CONFIG: AnimationConfigs = {
@@ -142,6 +145,7 @@ export default class MainScene extends Scene {
     const inventoryManager = new InventoryManager();
     
     this.combatManager = new CombatManager(this, playerStats, inventoryManager);
+    this.projectileManager = new ProjectileManager(this);
     
     // Add a test enemy
     this.addTestEnemy();
@@ -163,23 +167,82 @@ export default class MainScene extends Scene {
 
   private setupMouseControls() {
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.handleMouseClick(pointer.x, pointer.y);
+      this.handleMouseClick(pointer.x, pointer.y, pointer.rightButtonDown());
     });
   }
 
-  private handleMouseClick(x: number, y: number) {
-    if (!this.combatManager) return;
+  private handleMouseClick(x: number, y: number, isRightClick: boolean = false) {
+    if (!this.combatManager || !this.projectileManager) return;
 
+    if (isRightClick) {
+      // Right click for projectile attacks
+      this.handleProjectileAttack(x, y);
+    } else {
+      // Left click for melee attacks
+      this.handleMeleeAttack(x, y);
+    }
+  }
+
+  private handleMeleeAttack(x: number, y: number) {
     // Check if clicking on an enemy in range
     const result = this.combatManager.performAttack(x, y);
     
     if (result) {
-      console.log('Attack result:', result);
+      console.log('Melee attack result:', result);
       this.showAttackFeedback(result);
     } else {
       // No valid target or can't attack
-      console.log('No valid target or cannot attack');
+      console.log('No valid melee target or cannot attack');
     }
+  }
+
+  private handleProjectileAttack(x: number, y: number) {
+    if (!this.cat) return;
+
+    // Fire a projectile towards the target location
+    const projectileId = this.projectileManager.fireProjectile(
+      this.currentProjectileType,
+      this.cat.x,
+      this.cat.y,
+      x,
+      y,
+      'player'
+    );
+
+    if (projectileId) {
+      console.log(`Fired ${this.currentProjectileType}:`, projectileId);
+    } else {
+      console.log('Failed to fire projectile');
+    }
+  }
+
+  private selectProjectileType(type: string) {
+    this.currentProjectileType = type;
+    console.log(`Selected projectile type: ${type}`);
+    
+    // Show visual feedback for projectile selection
+    this.showProjectileSelectionFeedback(type);
+  }
+
+  private showProjectileSelectionFeedback(type: string) {
+    const text = this.add.text(400, 50, `Projectile: ${type.toUpperCase()}`, {
+      fontSize: '20px',
+      color: '#00ff00',
+      fontStyle: 'bold'
+    });
+
+    text.setOrigin(0.5, 0.5);
+
+    // Animate and remove the text
+    this.tweens.add({
+      targets: text,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Power2',
+      onComplete: () => {
+        text.destroy();
+      }
+    });
   }
 
   private showAttackFeedback(result: any) {
@@ -332,6 +395,17 @@ export default class MainScene extends Scene {
           console.log('Dodge attempt:', success ? 'success' : 'failed');
         }
       });
+
+      // Projectile type selection
+      const key1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
+      const key2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
+      const key3 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE);
+      const key4 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
+
+      key1.on('down', () => this.selectProjectileType('arrow'));
+      key2.on('down', () => this.selectProjectileType('magic_bolt'));
+      key3.on('down', () => this.selectProjectileType('fireball'));
+      key4.on('down', () => this.selectProjectileType('piercing_arrow'));
     }
   }
 
@@ -396,6 +470,13 @@ export default class MainScene extends Scene {
       if (this.combatManager) {
         this.combatManager.updatePlayerPosition(this.cat.x, this.cat.y);
         this.combatManager.update();
+      }
+
+      // Update projectile manager
+      if (this.projectileManager) {
+        const deltaTime = this.game.loop.delta;
+        const targets = this.combatManager ? this.combatManager.getAllTargets() : [];
+        this.projectileManager.update(deltaTime, targets);
       }
     } catch (error) {
       console.error('Error in update:', error);
