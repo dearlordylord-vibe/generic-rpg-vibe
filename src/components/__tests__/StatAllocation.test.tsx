@@ -1,10 +1,10 @@
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import StatAllocation from '../StatAllocation';
 import { PlayerStats } from '../../game/models/PlayerStats';
-import { selectPlayerStats, updateStats, initializePlayer } from '../../store/slices/playerSlice';
+import { initializePlayer } from '../../store/slices/playerSlice';
 import { GameState } from '../../game/models/GameState';
 import type { RootState } from '../../store';
 import type { PayloadAction } from '@reduxjs/toolkit';
@@ -35,15 +35,16 @@ const createMockStore = (initialStats?: PlayerStats) => {
   return configureStore({
     reducer: {
       game: (state = mockState.game) => state,
-      player: (state = mockState.player, action: PayloadAction<any>) => {
+      player: (state = mockState.player, action: PayloadAction<PlayerStats>) => {
         switch (action.type) {
-          case 'player/initializePlayer':
+          case 'player/initializePlayer': {
             const newStats = new PlayerStats();
             newStats.addStatPoints(5);
             return {
               ...state,
               stats: newStats.serialize()
             };
+          }
           case 'player/updateStats':
             return {
               ...state,

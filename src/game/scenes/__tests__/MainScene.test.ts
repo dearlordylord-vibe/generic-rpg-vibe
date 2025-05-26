@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Scene } from 'phaser';
+// import { Scene } from 'phaser';
 import MainScene from '../MainScene';
 import { GameState } from '../../models/GameState';
 
