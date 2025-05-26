@@ -28,7 +28,8 @@ const createMockStore = (initialStats?: PlayerStats) => {
       level: null,
       equipment: null,
       isLoading: false,
-      error: null
+      error: null,
+      levelUpMessage: null
     }
   };
   

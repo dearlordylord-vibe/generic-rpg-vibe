@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { useAppDispatch } from '../store';
+import { useAppDispatch, useAppSelector } from '../store';
 import { saveState, loadState } from '../store/slices/gameSlice';
-import { initializePlayer } from '../store/slices/playerSlice';
+import { initializePlayer, addXP, clearLevelUpMessage, selectLevelUpMessage } from '../store/slices/playerSlice';
 import { config as gameConfig } from '../game/config';
 import PlayerStats from './PlayerStats';
 import StatAllocation from './StatAllocation';
@@ -10,6 +10,7 @@ import './Game.css';
 export default function Game() {
   const gameRef = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
+  const levelUpMessage = useAppSelector(selectLevelUpMessage);
 
   useEffect(() => {
     // Initialize game state and player on first load
@@ -41,15 +42,34 @@ export default function Game() {
     dispatch(saveState());
   };
 
+  const handleAddXP = () => {
+    dispatch(addXP(150)); // Add enough XP to test leveling
+  };
+
+  const dismissLevelUp = () => {
+    dispatch(clearLevelUpMessage());
+  };
+
   return (
     <div className="game-container">
       <div className="game-canvas" ref={gameRef} />
       <div className="game-ui">
         <PlayerStats />
         <StatAllocation />
-        <button className="save-button" onClick={handleSaveGame}>
-          Save Game
-        </button>
+        <div className="game-controls">
+          <button className="save-button" onClick={handleSaveGame}>
+            Save Game
+          </button>
+          <button className="xp-button" onClick={handleAddXP}>
+            Add XP (Test)
+          </button>
+        </div>
+        {levelUpMessage && (
+          <div className="level-up-notification">
+            <p>{levelUpMessage}</p>
+            <button onClick={dismissLevelUp}>OK</button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -27,7 +27,12 @@
   gap: 20px;
 }
 
-.save-button {
+.game-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.save-button, .xp-button {
   background-color: #4a90e2;
   color: white;
   border: none;
@@ -38,8 +43,49 @@
   transition: background-color 0.2s ease;
 }
 
-.save-button:hover {
+.save-button:hover, .xp-button:hover {
   background-color: #357abd;
+}
+
+.xp-button {
+  background-color: #28a745;
+}
+
+.xp-button:hover {
+  background-color: #218838;
+}
+
+.level-up-notification {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 2px solid #4a90e2;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  text-align: center;
+}
+
+.level-up-notification p {
+  margin: 0 0 15px 0;
+  font-weight: bold;
+  color: #333;
+}
+
+.level-up-notification button {
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.level-up-notification button:hover {
+  background: #357abd;
 }
 
 .error-container {

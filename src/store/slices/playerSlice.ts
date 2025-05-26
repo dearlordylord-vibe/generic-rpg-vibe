@@ -10,6 +10,7 @@ interface PlayerState {
   equipment: string | null; // Serialized Equipment
   isLoading: boolean;
   error: string | null;
+  levelUpMessage: string | null; // Level up notification message
 }
 
 const initialState: PlayerState = {
@@ -17,7 +18,8 @@ const initialState: PlayerState = {
   level: null,
   equipment: null,
   isLoading: false,
-  error: null
+  error: null,
+  levelUpMessage: null
 };
 
 export const playerSlice = createSlice({
@@ -43,6 +45,38 @@ export const playerSlice = createSlice({
     updateLevel: (state, action: PayloadAction<PlayerLevel>) => {
       state.level = action.payload.serialize();
     },
+    addXP: (state, action: PayloadAction<number>) => {
+      if (!state.level || !state.stats) return;
+      
+      const level = PlayerLevel.deserialize(state.level);
+      const stats = PlayerStats.deserialize(state.stats);
+      
+      const oldLevel = level.getLevelInfo().currentLevel;
+      level.addXP(action.payload);
+      const newLevel = level.getLevelInfo().currentLevel;
+      
+      // If level increased, grant stat points
+      if (newLevel > oldLevel) {
+        let totalStatPoints = 0;
+        const config = level.getConfig();
+        
+        for (let lvl = oldLevel + 1; lvl <= newLevel; lvl++) {
+          let points = config.baseStatPoints;
+          if (config.bonusStatPointLevels.includes(lvl)) {
+            points += config.bonusStatPointAmount;
+          }
+          totalStatPoints += points;
+        }
+        
+        stats.addStatPoints(totalStatPoints);
+        state.stats = stats.serialize();
+        
+        // Set level up message
+        state.levelUpMessage = `Level Up! You reached level ${newLevel} and gained ${totalStatPoints} stat points!`;
+      }
+      
+      state.level = level.serialize();
+    },
     updateEquipment: (state, action: PayloadAction<Equipment>) => {
       state.equipment = action.payload.serialize();
     },
@@ -51,6 +85,9 @@ export const playerSlice = createSlice({
     },
     clearError: (state) => {
       state.error = null;
+    },
+    clearLevelUpMessage: (state) => {
+      state.levelUpMessage = null;
     }
   }
 });
@@ -60,9 +97,11 @@ export const {
   initializePlayer,
   updateStats,
   updateLevel,
+  addXP,
   updateEquipment,
   setError,
-  clearError
+  clearError,
+  clearLevelUpMessage
 } = playerSlice.actions;
 
 // Selectors
@@ -94,5 +133,6 @@ export const selectPlayerEquipment = createSelector(
 
 export const selectPlayerError = (state: RootState): string | null => state.player.error;
 export const selectPlayerIsLoading = (state: RootState): boolean => state.player.isLoading;
+export const selectLevelUpMessage = (state: RootState): string | null => state.player.levelUpMessage;
 
 export default playerSlice.reducer; 
