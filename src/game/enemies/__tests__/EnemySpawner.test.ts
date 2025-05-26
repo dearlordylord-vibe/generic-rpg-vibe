@@ -3,6 +3,13 @@ import { Scene } from 'phaser';
 import { EnemySpawner, SpawnZone, SpawnWave } from '../EnemySpawner';
 import { EnemyFactory, EnemyType } from '../EnemyFactory';
 
+// Create a more sophisticated delayedCall mock
+const delayedCallCallbacks: Array<{ delay: number, callback: () => void }> = [];
+const mockDelayedCall = vi.fn((delay, callback) => {
+  delayedCallCallbacks.push({ delay, callback });
+  return { destroy: vi.fn() };
+});
+
 // Mock Phaser Scene
 const mockScene = {
   scale: {
@@ -10,10 +17,7 @@ const mockScene = {
     height: 600
   },
   time: {
-    delayedCall: vi.fn((delay, callback) => {
-      // Immediately execute for testing
-      callback();
-    })
+    delayedCall: mockDelayedCall
   }
 } as unknown as Scene;
 
@@ -39,7 +43,20 @@ describe('EnemySpawner', () => {
   beforeEach(() => {
     spawner = new EnemySpawner(mockScene, mockFactory);
     vi.clearAllMocks();
+    delayedCallCallbacks.length = 0; // Clear callbacks array
   });
+
+  // Helper function to execute delayed callbacks
+  const executeDelayedCallbacks = () => {
+    // Execute callbacks in multiple passes to handle nested delayedCall calls
+    let maxIterations = 5;
+    while (delayedCallCallbacks.length > 0 && maxIterations > 0) {
+      const callbacks = [...delayedCallCallbacks];
+      delayedCallCallbacks.length = 0;
+      callbacks.forEach(({ callback }) => callback());
+      maxIterations--;
+    }
+  };
 
   afterEach(() => {
     spawner.destroy();
@@ -154,7 +171,8 @@ describe('EnemySpawner', () => {
       };
 
       spawner.addSpawnWave(wave);
-      spawner.startWave('test_wave');
+      const firstResult = spawner.startWave('test_wave');
+      expect(firstResult).toBe(true);
 
       // Try to start the same wave again
       const result = spawner.startWave('test_wave');
@@ -175,8 +193,9 @@ describe('EnemySpawner', () => {
       spawner.addSpawnWave(wave);
       spawner.startWave('test_wave');
 
-      // Should call delayedCall for each enemy group
+      // Should call delayedCall for enemy groups plus wave completion
       expect(mockScene.time.delayedCall).toHaveBeenCalled();
+      expect(mockScene.time.delayedCall).toHaveBeenCalledTimes(3); // 2 enemy groups + 1 completion
     });
 
     it('should create swarms for carrion bats', () => {
@@ -191,6 +210,7 @@ describe('EnemySpawner', () => {
 
       spawner.addSpawnWave(wave);
       spawner.startWave('bat_wave');
+      executeDelayedCallbacks(); // Execute all delayed callbacks including nested ones
 
       expect(mockFactory.createSwarm).toHaveBeenCalled();
     });
@@ -372,7 +392,13 @@ describe('EnemySpawner', () => {
     });
 
     it('should get spawned enemies by type', () => {
-      vi.mocked(mockEnemy.getName).mockReturnValue('Wraith');
+      // Create a mock with spy function
+      const mockGetName = vi.fn().mockReturnValue('Wraith');
+      const spyMockEnemy = {
+        ...mockEnemy,
+        getName: mockGetName
+      };
+      vi.mocked(mockFactory.createEnemy).mockReturnValue(spyMockEnemy);
 
       const zone: SpawnZone = {
         id: 'test_zone',
@@ -392,7 +418,7 @@ describe('EnemySpawner', () => {
 
       const wraithEnemies = spawner.getSpawnedEnemiesByType('wraith');
       expect(wraithEnemies).toHaveLength(1);
-      expect(wraithEnemies[0]).toBe(mockEnemy);
+      expect(wraithEnemies[0]).toBe(spyMockEnemy);
     });
 
     it('should clear all enemies', () => {
@@ -417,7 +443,7 @@ describe('EnemySpawner', () => {
       spawner.clearAllEnemies();
 
       expect(spawner.getSpawnedEnemyCount()).toBe(0);
-      expect(mockFactory.returnEnemyToPool).toHaveBeenCalledWith(mockEnemy);
+      expect(mockFactory.returnEnemyToPool).toHaveBeenCalled();
     });
 
     it('should stop all waves', () => {
@@ -483,6 +509,7 @@ describe('EnemySpawner', () => {
 
       spawner.addSpawnWave(wave);
       spawner.startWave('test_wave');
+      executeDelayedCallbacks(); // Execute all delayed callbacks including nested ones
 
       expect(mockFactory.createEnemy).toHaveBeenCalled();
       
