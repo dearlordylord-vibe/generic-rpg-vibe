@@ -1,4 +1,4 @@
-import { PlayerStats } from './PlayerStats';
+import { PlayerStats, IBaseStats } from './PlayerStats';
 import { PlayerLevel } from './PlayerLevel';
 import { Equipment } from './Equipment';
 
@@ -22,7 +22,7 @@ export interface IInventoryItem {
   name: string;
   type: 'weapon' | 'armor' | 'consumable' | 'quest';
   quantity: number;
-  stats?: Partial<Record<keyof PlayerStats, number>>;
+  stats?: Partial<IBaseStats>;
 }
 
 export interface IQuestState {

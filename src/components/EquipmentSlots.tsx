@@ -47,7 +47,7 @@ const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
   position, 
   onItemHover 
 }) => {
-  const [{ isOver }, drop] = useDrop({
+  const [{ isOver }, drop] = useDrop(() => ({
     accept: 'item',
     drop: (draggedItem: { id: string; sourceSlot: number; sourceType: string }) => {
       console.log('Item dropped into equipment slot:', slotId, draggedItem);
@@ -56,7 +56,7 @@ const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
     collect: (monitor) => ({
       isOver: monitor.isOver(),
     }),
-  });
+  }), [slotId]);
 
   // TODO: Get equipped item from state
   const equippedItem: IInventoryItem | null = null;
@@ -73,7 +73,7 @@ const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
 
   return (
     <div
-      ref={drop}
+      ref={drop as any}
       className={`equipment-slot ${isOver ? 'equipment-slot--drop-target' : ''}`}
       style={position}
       onMouseEnter={handleMouseEnter}

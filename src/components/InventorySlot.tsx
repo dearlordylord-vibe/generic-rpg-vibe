@@ -1,5 +1,8 @@
 import React from 'react';
 import { useDrag, useDrop } from 'react-dnd';
+import { useAppDispatch } from '../store';
+import { moveInventoryItem } from '../store/slices/gameSlice';
+import { clearDraggedItem } from '../store/slices/inventorySlice';
 import { IInventoryItem } from '../game/models/GameState';
 
 interface InventorySlotProps {
@@ -9,25 +12,35 @@ interface InventorySlotProps {
 }
 
 const InventorySlot: React.FC<InventorySlotProps> = ({ item, slotIndex, onItemHover }) => {
-  const [{ isDragging }, drag] = useDrag({
+  const dispatch = useAppDispatch();
+
+  const [{ isDragging }, drag] = useDrag(() => ({
     type: 'item',
     item: item ? { ...item, sourceSlot: slotIndex, sourceType: 'inventory' } : null,
     canDrag: !!item,
+    end: () => {
+      dispatch(clearDraggedItem());
+    },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-  });
+  }), [item, slotIndex, dispatch]);
 
-  const [{ isOver }, drop] = useDrop({
+  const [{ isOver }, drop] = useDrop(() => ({
     accept: 'item',
     drop: (draggedItem: { id: string; sourceSlot: number; sourceType: string }) => {
-      console.log('Item dropped into slot:', slotIndex, draggedItem);
-      // TODO: Handle item swapping/moving logic
+      if (draggedItem.sourceType === 'inventory' && draggedItem.sourceSlot !== slotIndex) {
+        // Move item within inventory
+        dispatch(moveInventoryItem({
+          fromIndex: draggedItem.sourceSlot,
+          toIndex: slotIndex
+        }));
+      }
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
     }),
-  });
+  }), [dispatch, slotIndex]);
 
   const handleMouseEnter = (event: React.MouseEvent) => {
     if (item) {

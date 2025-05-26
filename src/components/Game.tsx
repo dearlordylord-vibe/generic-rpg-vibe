@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
-import { saveState, loadState } from '../store/slices/gameSlice';
+import { saveState, loadState, addTestItems } from '../store/slices/gameSlice';
 import { initializePlayer, addXP, clearLevelUpMessage, selectLevelUpMessage } from '../store/slices/playerSlice';
 import { config as gameConfig } from '../game/config';
 import PlayerStats from './PlayerStats';
@@ -48,6 +48,10 @@ export default function Game() {
     dispatch(addXP(150)); // Add enough XP to test leveling
   };
 
+  const handleAddTestItems = () => {
+    dispatch(addTestItems());
+  };
+
   const dismissLevelUp = () => {
     dispatch(clearLevelUpMessage());
   };
@@ -64,6 +68,9 @@ export default function Game() {
           </button>
           <button className="xp-button" onClick={handleAddXP}>
             Add XP (Test)
+          </button>
+          <button className="test-items-button" onClick={handleAddTestItems}>
+            Add Test Items
           </button>
           <button className="inventory-button" onClick={() => setIsInventoryOpen(true)}>
             Inventory (I)

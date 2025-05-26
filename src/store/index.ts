@@ -2,11 +2,13 @@ import { configureStore } from '@reduxjs/toolkit';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import gameReducer from './slices/gameSlice';
 import playerReducer from './slices/playerSlice';
+import inventoryReducer from './slices/inventorySlice';
 
 export const store = configureStore({
   reducer: {
     game: gameReducer,
-    player: playerReducer
+    player: playerReducer,
+    inventory: inventoryReducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

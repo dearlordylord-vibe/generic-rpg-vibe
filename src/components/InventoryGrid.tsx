@@ -10,7 +10,7 @@ interface InventoryGridProps {
 }
 
 const InventoryGrid: React.FC<InventoryGridProps> = ({ items, maxSlots, onItemHover }) => {
-  const [{ isOver }, drop] = useDrop({
+  const [{ isOver }, drop] = useDrop(() => ({
     accept: 'item',
     drop: (draggedItem: { id: string; sourceSlot: number; sourceType: string }, monitor) => {
       if (!monitor.didDrop()) {
@@ -21,7 +21,7 @@ const InventoryGrid: React.FC<InventoryGridProps> = ({ items, maxSlots, onItemHo
     collect: (monitor) => ({
       isOver: monitor.isOver(),
     }),
-  });
+  }), []);
 
   // Create grid with items positioned correctly
   const grid = Array(maxSlots).fill(null);
@@ -33,7 +33,7 @@ const InventoryGrid: React.FC<InventoryGridProps> = ({ items, maxSlots, onItemHo
 
   return (
     <div 
-      ref={drop}
+      ref={drop as any}
       className={`inventory-grid ${isOver ? 'inventory-grid--drop-target' : ''}`}
     >
       {Array.from({ length: rows }, (_, rowIndex) => (
