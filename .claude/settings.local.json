@@ -14,7 +14,9 @@
       "Bash(npm run build:*)",
       "Bash(grep:*)",
       "Bash(npm run test:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run type-check:*)"
     ],
     "deny": []
   }
