@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { Enemy, IEnemyStats, IEnemyBehavior } from './Enemy';
+import { AttackPatternManager, AttackPatternContext } from '../ai/AttackPatterns';
 
 interface SwarmMate {
   id: string;
@@ -15,9 +16,13 @@ export class CarrionBats extends Enemy {
   private diveBombCooldown: number = 4000; // 4 seconds
   private poisonCloudDuration: number = 5000; // 5 seconds
   private isSwarmLeader: boolean = false;
+  private attackPatternManager: AttackPatternManager;
 
   constructor(scene: Scene, x: number, y: number, isLeader: boolean = false) {
     super(scene, x, y, 'carrionBat', 0);
+    
+    // Initialize attack pattern manager
+    this.attackPatternManager = new AttackPatternManager();
     
     this.isSwarmLeader = isLeader;
     this.baseY = y;
@@ -35,6 +40,14 @@ export class CarrionBats extends Enemy {
 
   protected getEnemyName(): string {
     return this.isSwarmLeader ? 'Carrion Bat Swarm Leader' : 'Carrion Bat';
+  }
+
+  public getIsSwarmLeader(): boolean {
+    return this.isSwarmLeader;
+  }
+
+  public getSwarmMatesCount(): number {
+    return this.swarmMates.length;
   }
 
   protected initializeStats(): IEnemyStats {
@@ -461,6 +474,20 @@ export class CarrionBats extends Enemy {
 
     if (distance > this.attackRadius * 2) {
       this.setState('chase');
+      return;
+    }
+
+    // Try advanced attack patterns first
+    const context: AttackPatternContext = {
+      enemy: this,
+      target: this.target,
+      scene: this.scene,
+      deltaTime: 16 // Approximate delta time
+    };
+
+    const selectedPattern = this.attackPatternManager.selectBestPattern('Carrion Bat', context);
+    if (selectedPattern) {
+      this.attackPatternManager.executePattern(selectedPattern, context);
       return;
     }
 

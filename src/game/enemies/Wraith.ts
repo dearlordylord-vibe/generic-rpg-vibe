@@ -1,12 +1,17 @@
 import { Scene } from 'phaser';
 import { Enemy, IEnemyStats, IEnemyBehavior } from './Enemy';
+import { AttackPatternManager, AttackPatternContext } from '../ai/AttackPatterns';
 
 export class Wraith extends Enemy {
   private phaseDuration: number = 2000; // 2 seconds
   private isPhasing: boolean = false;
+  private attackPatternManager: AttackPatternManager;
 
   constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y, 'wraith', 0);
+    
+    // Initialize attack pattern manager
+    this.attackPatternManager = new AttackPatternManager();
     
     // Wraith-specific settings
     this.detectionRadius = 200;
@@ -303,6 +308,20 @@ export class Wraith extends Enemy {
 
     if (distance > this.attackRadius * 1.5) {
       this.setState('chase');
+      return;
+    }
+
+    // Try advanced attack patterns first
+    const context: AttackPatternContext = {
+      enemy: this,
+      target: this.target,
+      scene: this.scene,
+      deltaTime: 16 // Approximate delta time
+    };
+
+    const selectedPattern = this.attackPatternManager.selectBestPattern('Wraith', context);
+    if (selectedPattern) {
+      this.attackPatternManager.executePattern(selectedPattern, context);
       return;
     }
 

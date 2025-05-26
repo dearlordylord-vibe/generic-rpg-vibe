@@ -1,14 +1,19 @@
 import { Scene } from 'phaser';
 import { Enemy, IEnemyStats, IEnemyBehavior } from './Enemy';
+import { AttackPatternManager, AttackPatternContext } from '../ai/AttackPatterns';
 
 export class IronGolem extends Enemy {
   private isCharging: boolean = false;
   private chargeDuration: number = 1500; // 1.5 seconds charge time
   private tauntRadius: number = 250;
   private slamRadius: number = 120;
+  private attackPatternManager: AttackPatternManager;
 
   constructor(scene: Scene, x: number, y: number) {
     super(scene, x, y, 'ironGolem', 0);
+    
+    // Initialize attack pattern manager
+    this.attackPatternManager = new AttackPatternManager();
     
     // Iron Golem-specific settings
     this.detectionRadius = 180;
@@ -397,6 +402,20 @@ export class IronGolem extends Enemy {
 
     // Don't execute other behaviors while charging
     if (this.isCharging) {
+      return;
+    }
+
+    // Try advanced attack patterns first
+    const context: AttackPatternContext = {
+      enemy: this,
+      target: this.target,
+      scene: this.scene,
+      deltaTime: 16 // Approximate delta time
+    };
+
+    const selectedPattern = this.attackPatternManager.selectBestPattern('Iron Golem', context);
+    if (selectedPattern) {
+      this.attackPatternManager.executePattern(selectedPattern, context);
       return;
     }
 
