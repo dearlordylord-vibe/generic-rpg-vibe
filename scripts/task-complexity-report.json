@@ -1,7 +1,7 @@
 {
   "meta": {
-    "generatedAt": "2025-05-25T21:52:36.862Z",
-    "tasksAnalyzed": 15,
+    "generatedAt": "2025-05-26T17:19:03.880Z",
+    "tasksAnalyzed": 1,
     "totalTasks": 15,
     "analysisCount": 15,
     "thresholdScore": 5,
@@ -48,14 +48,6 @@
       "recommendedSubtasks": 9,
       "expansionPrompt": "Break down into subtasks for abstract Enemy class, each enemy type, behavior tree system, unique attack patterns, enemy factory, spawning logic, and VFX integration.",
       "reasoning": "Implementing diverse enemy behaviors, AI, and unique abilities with a modular system is complex and requires robust architecture and testing."
-    },
-    {
-      "taskId": 6,
-      "taskTitle": "Develop Village and Shop System",
-      "complexityScore": 7,
-      "recommendedSubtasks": 8,
-      "expansionPrompt": "Expand into subtasks for Village class, Shop base class, Blacksmith/Apothecary, shop inventories, shop UI, gold/transaction logic, unlock requirements, and Tavern functionality.",
-      "reasoning": "This task involves multiple interconnected systems (shops, inventory, UI, transactions) and requires both backend and frontend work, making it moderately complex."
     },
     {
       "taskId": 7,
@@ -128,6 +120,14 @@
       "recommendedSubtasks": 8,
       "expansionPrompt": "Expand into subtasks for asset loading optimization, texture atlases, object pooling, render optimization, LOD systems, Web Workers, collision detection, React optimization, and code splitting.",
       "reasoning": "Performance tuning requires deep understanding of both frontend and game engine internals, profiling, and iterative improvements across many subsystems."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Develop Village and Shop System",
+      "complexityScore": 8,
+      "recommendedSubtasks": 12,
+      "expansionPrompt": "Break down the Village and Shop System implementation into detailed subtasks covering: village environment design, shop class hierarchy, inventory management, transaction system, UI components, state management, special shop features (Blacksmith unlock, Tavern healing), player interaction flows, and comprehensive testing strategy.",
+      "reasoning": "This task involves complex class hierarchies, multiple interconnected systems (inventory, transactions, UI), state management across components, and specialized shop features. The existing 10 subtasks cover the core functionality but would benefit from additional breakdown of the village environment design and more granular UI component development. The task requires integration between React and Phaser, implementation of multiple design patterns, and comprehensive testing across all layers."
     }
   ]
 }

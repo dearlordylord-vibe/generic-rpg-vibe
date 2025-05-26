@@ -16,7 +16,11 @@
       "Bash(npm run test:*)",
       "Bash(rg:*)",
       "Bash(mkdir:*)",
-      "Bash(npm run type-check:*)"
+      "Bash(npm run type-check:*)",
+      "mcp__taskmaster__analyze_project_complexity",
+      "mcp__taskmaster__expand_task",
+      "mcp__taskmaster__add_subtask",
+      "Bash(npm run lint:*)"
     ],
     "deny": []
   }
