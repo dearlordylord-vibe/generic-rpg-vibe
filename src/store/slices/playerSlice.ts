@@ -3,6 +3,7 @@ import { PlayerStats } from '../../game/models/PlayerStats';
 import { PlayerLevel } from '../../game/models/PlayerLevel';
 import { Equipment } from '../../game/models/Equipment';
 import { RootState } from '..';
+import { ImmerStateManager } from '../../utils/immerHelpers';
 
 interface PlayerState {
   stats: string | null; // Serialized PlayerStats
@@ -11,6 +12,7 @@ interface PlayerState {
   isLoading: boolean;
   error: string | null;
   levelUpMessage: string | null; // Level up notification message
+  stateManager: ImmerStateManager; // Immer state manager for undo/redo
 }
 
 const initialState: PlayerState = {
@@ -19,7 +21,8 @@ const initialState: PlayerState = {
   equipment: null,
   isLoading: false,
   error: null,
-  levelUpMessage: null
+  levelUpMessage: null,
+  stateManager: new ImmerStateManager()
 };
 
 export const playerSlice = createSlice({
@@ -88,6 +91,37 @@ export const playerSlice = createSlice({
     },
     clearLevelUpMessage: (state) => {
       state.levelUpMessage = null;
+    },
+    saveStateSnapshot: (state, action: PayloadAction<string>) => {
+      if (state.stats && state.level && state.equipment) {
+        const stats = PlayerStats.deserialize(state.stats);
+        const level = PlayerLevel.deserialize(state.level);
+        const equipment = Equipment.deserialize(state.equipment);
+        
+        const snapshot = state.stateManager.createSnapshot(
+          stats, level, equipment, action.payload
+        );
+        state.stateManager.pushState(snapshot);
+      }
+    },
+    undoState: (state) => {
+      const previousState = state.stateManager.undo();
+      if (previousState) {
+        state.stats = previousState.stats;
+        state.level = previousState.level;
+        state.equipment = previousState.equipment;
+      }
+    },
+    redoState: (state) => {
+      const nextState = state.stateManager.redo();
+      if (nextState) {
+        state.stats = nextState.stats;
+        state.level = nextState.level;
+        state.equipment = nextState.equipment;
+      }
+    },
+    clearStateHistory: (state) => {
+      state.stateManager.clearHistory();
     }
   }
 });
@@ -101,7 +135,11 @@ export const {
   updateEquipment,
   setError,
   clearError,
-  clearLevelUpMessage
+  clearLevelUpMessage,
+  saveStateSnapshot,
+  undoState,
+  redoState,
+  clearStateHistory
 } = playerSlice.actions;
 
 // Selectors
@@ -134,5 +172,8 @@ export const selectPlayerEquipment = createSelector(
 export const selectPlayerError = (state: RootState): string | null => state.player.error;
 export const selectPlayerIsLoading = (state: RootState): boolean => state.player.isLoading;
 export const selectLevelUpMessage = (state: RootState): string | null => state.player.levelUpMessage;
+export const selectCanUndo = (state: RootState): boolean => state.player.stateManager.canUndo();
+export const selectCanRedo = (state: RootState): boolean => state.player.stateManager.canRedo();
+export const selectCurrentStateDescription = (state: RootState): string => state.player.stateManager.getCurrentDescription();
 
 export default playerSlice.reducer; 

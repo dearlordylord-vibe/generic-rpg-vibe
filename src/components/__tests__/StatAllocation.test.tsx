@@ -6,6 +6,7 @@ import StatAllocation from '../StatAllocation';
 import { PlayerStats } from '../../game/models/PlayerStats';
 import { initializePlayer } from '../../store/slices/playerSlice';
 import { GameState } from '../../game/models/GameState';
+import { ImmerStateManager } from '../../utils/immerHelpers';
 import type { RootState } from '../../store';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
@@ -29,7 +30,8 @@ const createMockStore = (initialStats?: PlayerStats) => {
       equipment: null,
       isLoading: false,
       error: null,
-      levelUpMessage: null
+      levelUpMessage: null,
+      stateManager: new ImmerStateManager()
     }
   };
   

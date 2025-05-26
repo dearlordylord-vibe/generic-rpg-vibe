@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectPlayerStats, updateStats } from '../store/slices/playerSlice';
+import { selectPlayerStats, updateStats, saveStateSnapshot, undoState, redoState, selectCanUndo, selectCanRedo, selectCurrentStateDescription } from '../store/slices/playerSlice';
 import { PlayerStats, IBaseStats } from '../game/models/PlayerStats';
 import './StatAllocation.css';
 
 const StatAllocation: React.FC = () => {
   const stats = useSelector(selectPlayerStats);
+  const canUndo = useSelector(selectCanUndo);
+  const canRedo = useSelector(selectCanRedo);
+  const currentStateDescription = useSelector(selectCurrentStateDescription);
   const dispatch = useDispatch();
   const [previewStat, setPreviewStat] = useState<keyof IBaseStats | null>(null);
 
@@ -15,6 +18,9 @@ const StatAllocation: React.FC = () => {
 
   const handleStatIncrease = (stat: keyof IBaseStats) => {
     if (stats.canAllocateStatPoint(stat)) {
+      // Save current state before making changes
+      dispatch(saveStateSnapshot(`Allocated point to ${stat}`));
+      
       const newStats = PlayerStats.deserialize(stats.serialize());
       newStats.allocateStatPoint(stat);
       dispatch(updateStats(newStats));
@@ -22,10 +28,19 @@ const StatAllocation: React.FC = () => {
   };
 
   const handleUndo = () => {
-    if (stats.canUndo()) {
+    if (canUndo) {
+      dispatch(undoState());
+    } else if (stats.canUndo()) {
+      // Fallback to PlayerStats internal undo
       const newStats = PlayerStats.deserialize(stats.serialize());
       newStats.undoLastAllocation();
       dispatch(updateStats(newStats));
+    }
+  };
+
+  const handleRedo = () => {
+    if (canRedo) {
+      dispatch(redoState());
     }
   };
 
@@ -79,24 +94,53 @@ const StatAllocation: React.FC = () => {
         <h3 style={{ flexGrow: 1, margin: 0 }}>
           Available Points: {stats.getAvailableStatPoints()}
         </h3>
-        <button
-          onClick={handleUndo}
-          disabled={!stats.canUndo()}
-          title="Undo last allocation"
-          data-testid="undo-button"
-          style={{
-            padding: '8px 12px',
-            backgroundColor: stats.canUndo() ? '#4a90e2' : '#666',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: stats.canUndo() ? 'pointer' : 'not-allowed',
-            opacity: stats.canUndo() ? 1 : 0.7
-          }}
-        >
-          Undo
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleUndo}
+            disabled={!canUndo && !stats.canUndo()}
+            title="Undo last allocation"
+            data-testid="undo-button"
+            style={{
+              padding: '8px 12px',
+              backgroundColor: (canUndo || stats.canUndo()) ? '#4a90e2' : '#666',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: (canUndo || stats.canUndo()) ? 'pointer' : 'not-allowed',
+              opacity: (canUndo || stats.canUndo()) ? 1 : 0.7
+            }}
+          >
+            Undo
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={!canRedo}
+            title="Redo last undone action"
+            data-testid="redo-button"
+            style={{
+              padding: '8px 12px',
+              backgroundColor: canRedo ? '#28a745' : '#666',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: canRedo ? 'pointer' : 'not-allowed',
+              opacity: canRedo ? 1 : 0.7
+            }}
+          >
+            Redo
+          </button>
+        </div>
       </div>
+      {currentStateDescription && currentStateDescription !== 'Initial state' && (
+        <div style={{ 
+          fontSize: '12px', 
+          color: '#666', 
+          marginBottom: '10px',
+          fontStyle: 'italic'
+        }}>
+          Last action: {currentStateDescription}
+        </div>
+      )}
 
       <div className="stats-list">
         {renderStat(
