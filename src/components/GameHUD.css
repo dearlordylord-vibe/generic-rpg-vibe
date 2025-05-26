@@ -1,0 +1,190 @@
+.game-hud {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  pointer-events: none;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.hud-vitals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.vital-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.vital-label {
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  min-width: 24px;
+}
+
+.vital-progress {
+  flex: 1;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.vital-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.health-fill {
+  background: linear-gradient(90deg, #ff4444 0%, #ff6666 100%);
+}
+
+.mana-fill {
+  background: linear-gradient(90deg, #4444ff 0%, #6666ff 100%);
+}
+
+.vital-text {
+  color: white;
+  font-size: 12px;
+  font-family: monospace;
+  min-width: 60px;
+  text-align: right;
+}
+
+.combat-states {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.combat-state {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 14px;
+  text-align: center;
+  border: 2px solid;
+  animation: pulse 1s infinite;
+}
+
+.combat-state.blocking {
+  border-color: #4444ff;
+  color: #88aaff;
+}
+
+.combat-state.dodging {
+  border-color: #44ff44;
+  color: #88ff88;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.hud-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.selection-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.selection-label {
+  color: #ccc;
+  font-size: 12px;
+  text-align: center;
+}
+
+.selection-item {
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  text-align: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 2px solid;
+  min-width: 120px;
+}
+
+.projectile-selection {
+  border-color: #ff8844;
+  background: rgba(255, 136, 68, 0.2);
+}
+
+.aoe-selection {
+  border-color: #ff4488;
+  background: rgba(255, 68, 136, 0.2);
+}
+
+.hud-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  font-size: 12px;
+}
+
+.control-hint {
+  color: #ccc;
+  white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .game-hud {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .hud-controls {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .hud-selection {
+    flex-direction: row;
+    gap: 8px;
+  }
+  
+  .selection-item {
+    font-size: 12px;
+    min-width: 80px;
+    padding: 4px 8px;
+  }
+  
+  .vital-bar {
+    min-width: 150px;
+  }
+}
