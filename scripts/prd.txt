@@ -1,0 +1,192 @@
+Comprehensive PRD for Dark Fantasy Browser-Based RPG
+Overview
+This product requirements document outlines the development of Shadowreach Chronicles, a dark fantasy real-time RPG targeting browser platforms. Built with TypeScript, the game features stat-driven combat, equipment progression, and exploratory quests across 3-5 grim locations. Designed for solo development, the MVP focuses on core mechanics: a central village with functional shops, a combat zone, and modular systems for future expansion.
+
+Core Game Systems
+Character Progression
+Stat Framework
+Players allocate points to Strength (melee damage/equip heavy weapons), Agility (attack speed/dodge chance/ranged accuracy), Vitality (HP pool/poison resistance), and Intelligence (mana pool/spell potency). Each stat impacts:
+
+Combat Formulas:
+
+Melee Damage = (Weapon Base × Strength) × (1 + Agility/200)
+
+Dodge Chance = Agility/(Agility + Enemy Level × 10)
+
+Equipment Requirements:
+
+Plate Armor: Strength 15 + Vitality 10
+
+Spell Tome: Intelligence 20
+
+Leveling System
+Using a modified Final Fantasy XP curve:
+
+text
+XP Required = 1000 × (Current Level)^1.5  
+Post-Level 30 introduces diminishing returns via:
+
+text
+XP Required += 500 × (Current Level - 30)^2  
+Ensures late-game grind aligns with dark fantasy's oppressive tone.
+
+Combat Design
+Real-Time Mechanics
+Click-to-Attack with 2.5m melee range
+
+Projectile Arcs: Arrows/spells follow parabolic trajectories calculated via:
+
+text
+y = x × tanθ - (g × x²)/(2 × v² × cos²θ)  
+Where θ=launch angle, v=projectile speed (agility-dependent)
+
+AOE Effects: Flame Nova spell radiates damage using:
+
+text
+Damage = Base × (1 - Distance/Radius)  
+With radius scaling via Intelligence
+
+Enemy Archetypes
+Enemy	Spawn Zone	Behavior Tree	Weakness
+Wraith	Forgotten Crypt	Flee at <30% HP, life drain attack	Holy damage
+Iron Golem	Scrapheap Canyon	Taunt players, ground slam AOE	Lightning
+Carrion Bats	Bloodmire Swamp	Swarm (5+ aggro), poison DoT	Fire
+Equipment Economy
+Shop Inventories
+Blacksmith (Requires 500g unlock):
+
+Item	Stats	Cost
+Rusted Claymore	+8 Strength, -5% Attack Speed	150g
+Shadowmail	+15 Vitality, +10% Dodge	400g
+Apothecary:
+
+Health Potion (50g): Restores 25% HP over 5s
+
+Mana Essence (80g): +30 Mana instantly
+
+Quest System
+Side Quest Examples
+Tavernkeeper's Dilemma (Repeatable):
+
+Objective: Retrieve 5 Ghostly Essences from Wraiths
+
+Reward: 200g + Minor Healing Tome (Vitality +2)
+
+Failure Condition: Player dies or leaves zone
+
+Blacksmith's Request (Chain):
+
+Deliver 10 Iron Ore (Scrapheap Canyon)
+
+Defend caravan from Golem attack
+
+Choose reward: Weapon upgrade or armor enchant
+
+Technical Architecture
+Engine Selection
+Phaser 3 + React + TypeScript Template:
+
+Advantages:
+
+Built-in physics engine for collision/AOE detection
+
+WebGL rendering handles 100+ enemies at 60FPS
+
+React integration for complex UIs (inventory/quest logs)
+
+Modular Addons:
+
+Rex UI Plugin: Dynamic menus with depth sorting
+
+InkJS: Branching dialogue trees compatible with Yarn Spinner
+
+Data Models
+Player Schema (LocalStorage):
+
+typescript
+interface PlayerSave {
+  stats: {
+    str: number;
+    agi: number;
+    vit: number;
+    int: number;
+  };
+  inventory: Array<{
+    itemId: string;
+    quantity: number;
+    equipped: boolean;
+  }>;
+  questProgress: Record<string, number>;
+}
+Network Layer
+Future-Proofing:
+
+All game logic compartmentalized in pure functions
+
+State management via Redux for eventual multiplayer migration
+
+Development Roadmap
+Phase 1: MVP (6 Weeks)
+Core Systems:
+
+Phaser physics integration
+
+Stat/leveling calculator
+
+LocalStorage save/load
+
+Village Implementation:
+
+Tavern (HP regen)
+
+Blacksmith shop
+
+2 NPCs with InkJS dialogues
+
+Combat Zone:
+
+Wraith enemy AI
+
+Basic melee/ranged combat
+
+Phase 2: Content Expansion (4 Weeks)
+Add Scrapheap Canyon zone
+
+Implement Golem enemy with ground slam
+
+Crafting system for ore-to-gear conversion
+
+Phase 3: Polishing (2 Weeks)
+Balance XP curves via playtesting
+
+Add particle effects for spell impacts
+
+Optimize WebGL draw calls
+
+Risks & Mitigations
+Risk	Probability	Impact	Mitigation Strategy
+Combat feels unresponsive	High	Critical	Implement input buffering system
+XP curve too steep	Medium	High	Build configurable scaling parameters
+Phaser-React state sync issues	Low	Medium	Use Redux middleware for decoupling
+Appendix
+Key Formulas
+Damage Calculation:
+
+text
+Final Damage = (Base × StatMod) × (1 - Armor/(Armor + 100))  
+Where Armor = Vitality × 0.8 + Equipment Bonus
+
+Dodge Chance:
+
+text
+Dodge% = (Agility - Enemy Precision) × 0.5%  
+Capped at 75%
+
+UI Mockups
+Inventory Screen:
+
+Left panel: Equipment slots (click to unequip)
+
+Center: Grid-based inventory (drag-drop)
+
+Right: Stat summary with compare tooltips
