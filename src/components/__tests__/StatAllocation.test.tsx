@@ -78,11 +78,11 @@ describe('StatAllocation', () => {
       </Provider>
     );
 
-    expect(screen.getByText(/Strength:/)).toBeInTheDocument();
-    expect(screen.getByText(/Dexterity:/)).toBeInTheDocument();
-    expect(screen.getByText(/Intelligence:/)).toBeInTheDocument();
-    expect(screen.getByText(/Vitality:/)).toBeInTheDocument();
-    expect(screen.getByText(/Luck:/)).toBeInTheDocument();
+    expect(screen.getByText('Strength')).toBeInTheDocument();
+    expect(screen.getByText('Dexterity')).toBeInTheDocument();
+    expect(screen.getByText('Intelligence')).toBeInTheDocument();
+    expect(screen.getByText('Vitality')).toBeInTheDocument();
+    expect(screen.getByText('Luck')).toBeInTheDocument();
   });
 
   it('should allocate a point when clicking the increase button', () => {
@@ -127,7 +127,6 @@ describe('StatAllocation', () => {
     ['strength', 'dexterity', 'intelligence', 'vitality', 'luck'].forEach(stat => {
       const button = screen.getByTestId(`increase-${stat}-button`);
       expect(button).toBeDisabled();
-      expect(button).toHaveClass('Mui-disabled');
     });
   });
 
@@ -154,7 +153,6 @@ describe('StatAllocation', () => {
     // Verify the strength increase button is disabled
     const strengthButton = screen.getByTestId('increase-strength-button');
     expect(strengthButton).toBeDisabled();
-    expect(strengthButton).toHaveClass('Mui-disabled');
 
     // Verify that we cannot allocate more points to strength
     expect(initialStats.canAllocateStatPoint('strength')).toBe(false);

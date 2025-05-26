@@ -2,10 +2,6 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectPlayerStats, updateStats } from '../store/slices/playerSlice';
 import { PlayerStats, IBaseStats } from '../game/models/PlayerStats';
-import { Button, Typography, Box, Tooltip, IconButton } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import UndoIcon from '@mui/icons-material/Undo';
-import InfoIcon from '@mui/icons-material/Info';
 import './StatAllocation.css';
 
 const StatAllocation: React.FC = () => {
@@ -14,7 +10,7 @@ const StatAllocation: React.FC = () => {
   const [previewStat, setPreviewStat] = useState<keyof IBaseStats | null>(null);
 
   if (!stats) {
-    return <Typography>Loading stats...</Typography>;
+    return <div>Loading stats...</div>;
   }
 
   const handleStatIncrease = (stat: keyof IBaseStats) => {
@@ -49,94 +45,87 @@ const StatAllocation: React.FC = () => {
     const currentValue = stats.getBaseStat(stat);
 
     return (
-      <Box key={stat} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Tooltip title={description} arrow>
-          <IconButton size="small" sx={{ mr: 1 }}>
-            <InfoIcon />
-          </IconButton>
-        </Tooltip>
-        <Typography sx={{ minWidth: 120 }}>{label}:</Typography>
-        <Typography sx={{ minWidth: 40, textAlign: 'right' }}>
-          {currentValue}
-          {preview && (
-            <Typography component="span" color="primary">
-              {' → ' + preview.getBaseStat(stat)}
-            </Typography>
-          )}
-        </Typography>
-        <Box sx={{ ml: 2 }}>
-          <Button
-            size="small"
-            variant="outlined"
+      <div key={stat} className="stat-row">
+        <div className="stat-info">
+          <div className="stat-name">{label}</div>
+          <div className="stat-value">
+            {currentValue}
+            {preview && (
+              <span style={{ color: '#4a90e2' }}>
+                {' → ' + preview.getBaseStat(stat)}
+              </span>
+            )}
+          </div>
+          <button
+            className="allocate-button"
             onClick={() => handleStatIncrease(stat)}
             onMouseEnter={() => handleStatHover(stat)}
             onMouseLeave={() => handleStatHover(null)}
             disabled={!canAllocate}
-            disableRipple
             data-testid={`increase-${stat}-button`}
             title={canAllocate ? `Cost: ${cost} point${cost > 1 ? 's' : ''}` : 'Cannot allocate more points'}
-            sx={{
-              minWidth: 'unset',
-              padding: '4px',
-              '&.Mui-disabled': {
-                backgroundColor: 'transparent',
-                border: '1px solid rgba(0, 0, 0, 0.12)',
-                color: 'rgba(0, 0, 0, 0.26)',
-                pointerEvents: 'none',
-                cursor: 'not-allowed'
-              }
-            }}
           >
-            <AddIcon />
-          </Button>
-        </Box>
-      </Box>
+            +
+          </button>
+        </div>
+        <div className="stat-description">{description}</div>
+      </div>
     );
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+    <div className="stat-allocation">
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
+        <h3 style={{ flexGrow: 1, margin: 0 }}>
           Available Points: {stats.getAvailableStatPoints()}
-        </Typography>
-        <IconButton
+        </h3>
+        <button
           onClick={handleUndo}
           disabled={!stats.canUndo()}
-          color="primary"
           title="Undo last allocation"
           data-testid="undo-button"
+          style={{
+            padding: '8px 12px',
+            backgroundColor: stats.canUndo() ? '#4a90e2' : '#666',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: stats.canUndo() ? 'pointer' : 'not-allowed',
+            opacity: stats.canUndo() ? 1 : 0.7
+          }}
         >
-          <UndoIcon />
-        </IconButton>
-      </Box>
+          Undo
+        </button>
+      </div>
 
-      {renderStat(
-        'strength',
-        'Strength',
-        'Affects physical damage and carrying capacity'
-      )}
-      {renderStat(
-        'dexterity',
-        'Dexterity',
-        'Affects accuracy, evasion, and attack speed'
-      )}
-      {renderStat(
-        'intelligence',
-        'Intelligence',
-        'Affects magic power and mana pool'
-      )}
-      {renderStat(
-        'vitality',
-        'Vitality',
-        'Affects health points and stamina'
-      )}
-      {renderStat(
-        'luck',
-        'Luck',
-        'Affects critical hit chance and item discovery'
-      )}
-    </Box>
+      <div className="stats-list">
+        {renderStat(
+          'strength',
+          'Strength',
+          'Affects physical damage and carrying capacity'
+        )}
+        {renderStat(
+          'dexterity',
+          'Dexterity',
+          'Affects accuracy, evasion, and attack speed'
+        )}
+        {renderStat(
+          'intelligence',
+          'Intelligence',
+          'Affects magic power and mana pool'
+        )}
+        {renderStat(
+          'vitality',
+          'Vitality',
+          'Affects health points and stamina'
+        )}
+        {renderStat(
+          'luck',
+          'Luck',
+          'Affects critical hit chance and item discovery'
+        )}
+      </div>
+    </div>
   );
 };
 

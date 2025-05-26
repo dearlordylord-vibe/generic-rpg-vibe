@@ -29,6 +29,9 @@ export const playerSlice = createSlice({
       const level = new PlayerLevel();
       const equipment = new Equipment();
       
+      // Give player some initial stat points for testing
+      stats.addStatPoints(10);
+      
       state.stats = stats.serialize();
       state.level = level.serialize();
       state.equipment = equipment.serialize();
